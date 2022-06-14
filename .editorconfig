@@ -1,0 +1,111 @@
+# What is this? EditorConfig is a file which many text editors natively support, and many others
+# have plugins available to achieve the same, which tells a text editor universal settings that it
+# should use when editing a particular project. This is useful so that a style guide can be
+# maintained throughout the project.
+
+# The code style used in AquariWM is the official Rust language style guide, and it can be
+# summarised as the following:
+#
+#     -   Use line comments (//) instead of block comments (/* and */).
+#     -   Lines must not exceed 99 characters in length.
+#     -   Use 4 spaces for indentation, not tabs.
+#     -   No trailing whitespace at the end of lines and files.
+#     -   Use spaces around operators, e.g. `a * b`, not `a*b`.
+#     -   Use a space after colons and commas, e.g. `a: Bar` and `a, b`, not `a:bar` or `a,b`.
+#     -   Use a space after the opening and before the closing brace in single line blocks ({ a }).
+#     -   For multiline function signatures, each line should align with the first parameter.
+#         For example:
+#
+#     `   fn foo(a: Bar, b: Bar,
+#     `          c: Bar, d: Bar)
+#     `          -> Bar {
+#
+#     -   Do not use extra whitespace in a line to provide alignment. For example:
+#
+#     `   let a = 0;
+#     `   let longer_name = 3;
+#
+#         Instead of:
+#
+#     `   let a           = 0;
+#     `   let longer_name = 3;
+#
+#     -   In general, naming conventions are the following:
+#
+#         Type-level constructs:    CamelCase
+#         Value-level constructs:   snake_case
+#         Constants:                SCREAMING_SNAKE_CASE
+#
+# More information about Rust's style guide can be found at:
+#     https://doc.rust-lang.org/1.0.0/style/style/README.html
+#
+# We recommend that you read the 'Rust book' (The Rust Programming Language) to learn Rust, it has
+# proved a very, very well-written resource for both novices and experts alike. You can find it for
+# free online at:
+#     https://doc.rust-lang.org/stable/book/
+
+# This declares that this is the .editorconfig file for the whole project, i.e. the root.
+root = true
+
+# This configures the indentation style to match Rust's official style guide. We recognise that
+# this is not ideal for all users for accessibility reasons, and we recommend that for such users
+# where fixed-width tabs may prove a problem, that they explore other tools at their disposal. For
+# example, if there may be tools that can visually resize indentation while keeping the number of
+# spaces, or tools that can change the number of spaces *only* when editing files, not when saving.
+indent_style = space
+indent_size = 4
+
+# While this is not part of Rust's official style guide, AquariWM is a project that primarily
+# caters to Linux-based operating systems and users who will be contributing from such Linux-based
+# operating systems. For this reason, the line endings used on Linux are the preferred line endings
+# for the AquariWM project.
+end_of_line = lf
+
+# To ensure AquariWM is accessible to speakers of other languages, among other reasons, Unicode
+# file encoding is required for files within the AquariWM project. Specifically, UTF-8 is
+# specified.
+charset = utf-8
+
+# As per Rust's official style guide, trailing whitespace shall be trimmed from the end of lines.
+trim_trailing_whitespace = true
+
+# As per Rust's official style guide, trailing lines shall be trimmed from the end of files.
+insert_final_newline = false
+
+# While supported by a limited number of editors, a maximum line length of 100 characters shall be
+# enforced throughout the AquariWM project, in accordance with Rust's official style guide.
+#
+# This feature is supported by the following editors:
+#   Emacs
+#   Vim
+#   Atom
+#   ReSharper
+#   Rider
+#   AppCode
+#   IntelliJ IDEA
+#   PhpStorm
+#   PyCharm
+#   RubyMine
+#   WebStorm
+#   Kakoune
+#   Prettier
+#
+# Users of other text editors should manually configure or enforce this maximum line length
+# themselves.
+max_line_length = 100
+
+### The following options are not supported by EditorConfig, but are popular proposals. We have ###
+### included them on the offchance that support may be implemented for them by editors in the   ###
+### future.                                                                                     ###
+
+# Double quotes are preferred (", not ')
+quote_type = double
+
+# Curly brackets shall remain on the same line.
+curly_bracket_next_line = false
+
+# Spaces shall be included around operators.
+spaces_around_operators = true
+
+# Spaces shall be added around single-line blocks of code on the inside of brackets.
+spaces_around_brackets = inside
