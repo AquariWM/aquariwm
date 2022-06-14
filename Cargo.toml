@@ -3,7 +3,7 @@
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 [package]
-name = "AquariWM"
+name = "aquariwm"
 version = "0.1.0"
 authors = ["Antikyth <antikyth at gmail dot com>", "AquariWM"]
 edition = "2021"
