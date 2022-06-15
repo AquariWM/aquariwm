@@ -1,9 +1,6 @@
 Any language, any level of experience, fully extensible. It's time for a tiling window manager
 *everyone* can use.
 
-AquariWM focuses on four key pillars: accessibility, extensibility, documentation, and
-open for everyone.
-
 ## Installation
 AquariWM is currently in development and does not have a public release yet. You can clone the
 GitHub repository and build the code locally if you would like to test it and/or contribute.
