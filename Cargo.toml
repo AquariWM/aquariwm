@@ -5,11 +5,11 @@
 [package]
 name = "aquariwm"
 version = "0.1.0"
-authors = ["Antikyth <antikyth at gmail dot com>", "AquariWM"]
+authors = ["Antikyth <antikyth at gmail dot com>", "AquariWM <contact@aquariwm.org>"]
 edition = "2021"
 description = "The extensible user-friendly window manager."
 readme = true
-homepage = "https://github.com/AquariWM/AquariWM"
+homepage = "https://aquariwm.org/"
 repository = "https://github.com/AquariWM/AquariWM"
 license = "MPL-2.0"
 keywords = ["window", "window-manager", "linux", "documented"]
