@@ -7,7 +7,8 @@ name = "aquariwm"
 version = "0.1.0"
 authors = ["Antikyth <antikyth at gmail dot com>", "AquariWM <contact@aquariwm.org>"]
 edition = "2021"
-description = "The extensible user-friendly window manager."
+description = """Any language, any level of experience, fully extensible. \
+                 It's time for a tiling window manager everyone can use."""
 readme = true
 homepage = "https://aquariwm.org/"
 repository = "https://github.com/AquariWM/aquariwm"
