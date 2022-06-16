@@ -19,3 +19,4 @@ categories = [ "accessibility", "config", "graphics", "gui" ]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+xcb = "1.1.1"
