@@ -5,7 +5,7 @@
 [package]
 name = "aquariwm"
 version = "0.1.0"
-authors = ["Antikyth <antikyth at gmail dot com>", "AquariWM <contact@aquariwm.org>"]
+authors = [ "AquariWM <contact@aquariwm.org>", "Antikyth <antikyth at gmail dot com>" ]
 edition = "2021"
 description = """Any language, any level of experience, fully extensible. \
                  It's time for a tiling window manager everyone can use."""
@@ -13,8 +13,8 @@ readme = true
 homepage = "https://aquariwm.org/"
 repository = "https://github.com/AquariWM/aquariwm"
 license = "MPL-2.0"
-keywords = ["x11", "window-manager", "xorg", "window", "linux"]
-categories = ["accessibility", "config", "graphics", "gui"]
+keywords = [ "x11", "window-manager", "xorg", "window", "linux" ]
+categories = [ "accessibility", "config", "graphics", "gui" ]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
