@@ -13,7 +13,7 @@ readme = true
 homepage = "https://aquariwm.org/"
 repository = "https://github.com/AquariWM/aquariwm"
 license = "MPL-2.0"
-keywords = ["window", "window-manager", "linux", "documented"]
+keywords = ["x11", "window-manager", "xorg", "window", "linux"]
 categories = ["accessibility", "config", "graphics", "gui"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
