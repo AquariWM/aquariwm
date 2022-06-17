@@ -1,3 +1,7 @@
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this
+   - file, You can obtain one at https://mozilla.org/MPL/2.0/. -->
+
 AquariWM is a fully modular window manager, allowing extreme extensibility while accommodating all
 users, from newcomers to seasoned experts.
 
