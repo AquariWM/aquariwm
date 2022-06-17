@@ -1,5 +1,5 @@
-Any language, any level of experience, fully extensible. It's time for a tiling window manager
-*everyone* can use.
+AquariWM is a fully modular window manager, allowing extreme extensibility while accommodating all
+users, from newcomers to seasoned experts.
 
 ## Installation
 AquariWM is currently in development and does not have a public release yet. You can clone the
