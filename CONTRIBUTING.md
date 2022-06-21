@@ -8,9 +8,6 @@ to achieve and the plans that have been created for its features and code that h
 yet been implemented.
 
 # License headers
-AquariWM's core is licensed under the MPL-2.0 license, and requires that license headers
-be present at the beginning of all source code added by contributors to the project.
-
 AquariWM's core is licensed under the Mozilla Public License v2.0 (MPL-2.0) license.
 As stated by Mozilla:
 
