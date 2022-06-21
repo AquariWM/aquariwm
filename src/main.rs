@@ -23,3 +23,33 @@
 // the fundamentals of module communication set up: try to have a custom message sent through an
 // IPC socket to AquariWM with information on where to put the focused window, and then have the
 // AquariWM core move the focused window based on those coordinates received over IPC.
+
+fn main() {
+    // stub
+}
+
+// Window managers in X are simply clients that have permission to perform substructure redirection
+// on the root window. Only one such client can be active at once. Start by informing X that we
+// would like to select input on the root window for the substrcuture redirect mask and the
+// substructure notify mask.
+
+// Start by telling X what we want to receive events for. We want to receive input events for
+// cursor movement (motion events), Super + Left Mouse Button, Super + Right Mouse Button, and
+// Super + f.
+
+// select mouse motion input
+// grab Super + Left Mouse Button
+// grab Super + Right Mouse Button
+// grab Super + f
+
+// event loop {
+// //
+// // mouse motion {
+// // // if (hovered window != focused window) focus(hovered window)
+// // }
+// //
+// // Super + Left Mouse Button -> move window
+// // Super + Right Mouse Button -> resize window
+// // Super + F -> toggle fullscreen on the window
+// //
+// }
