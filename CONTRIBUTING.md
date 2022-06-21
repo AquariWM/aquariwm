@@ -67,7 +67,7 @@ wherever possible:
    indentation differently, or that can convert this indentation to tab characters while
    editing, and then back to 4 spaces when submitting.
  - **No trailing whitespace at the end of lines** (if a line only contains `x`, then it should
-   be, in total, just `x` (rather than `x ` or `x  `, etc.)
+   be, in total, just `x` (rather than `x `, for example)
  - **No trailing whitespace should be used at the end of files**, including blank lines.
 
 More information regarding whitespace can be found in
