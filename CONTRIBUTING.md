@@ -54,7 +54,9 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Code style
 It is important to maintain a consistent code style through the AquariWM project, and
 among various code editors. As such, please stick to the following style guidelines
-wherever possible:
+wherever possible. Most of the code style guidelines used in AquariWM are directly from
+[Rust's code style guidelines](https://doc.rust-lang.org/1.0.0/style/README.html), as Rust
+is the language of choice for AquariWM's core.
 
 ## Whitespace and indentation
  - **Lines of code have a strict maximum length of 99 characters,** except where absolutely
@@ -66,8 +68,8 @@ wherever possible:
    for the Rust language. You may configure your own tools that let you view 4-space
    indentation differently, or that can convert this indentation to tab characters while
    editing, and then back to 4 spaces when submitting.
- - **No trailing whitespace at the end of lines** (if a line only contains `x`, then it should
-   be, in total, just `x` (rather than `x `, for example)
+ - **No trailing whitespace at the end of lines** (if a line only contains `x`, then it
+   should be, in total, just `x` (rather than `x `, for example)
  - **No trailing whitespace should be used at the end of files**, including blank lines.
 
 More information regarding whitespace can be found in
