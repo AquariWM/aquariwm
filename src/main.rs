@@ -2,16 +2,22 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-// See:
-// ============================
-// rust-xcb docs - https://rust-x-bindings.github.io/rust-xcb/xcb/index.html
-// rust-xcb repo - https://github.com/rust-x-bindings/rust-xcb
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+// There are a number of resources that you may find helpful when writing this first stub.
 //
-// how X window managers work and how to write one:
-//      https://jichu4n.com/posts/how-x-window-managers-work-and-how-to-write-one-part-i/
-//
-// Inter-Client Communication Conventions Manual - https://tronche.com/gui/x/icccm/
-// Extended Window Manager Hints - https://specifications.freedesktop.org/wm-spec/latest/
+// rust-xcb documentation           https://rust-x-bindings.github.io/rust-xcb/xcb/index.html
+// rust-xcb github                  https://github.com/rust-x-bindings/rust-xcb
+// how to write a window manager----
+//              https://jich4n.com/posts/how-x-window-managers-work-and-how-to-write-one-part-i/
+// ICCCM                            https://tronche.com/gui/x/icccm/
+// EWMH                             https://specifications.freedesktop.org/wm-spec/latest/
+// tinywm, a helpful reference      http://incise.org/tinywm.html
+// the rust programming book        https://doc.rust-lang.org/stable/book/
+// XCB tutorial                     https://xcb.freedesktop.org/tutorial/
+// XCB window manipulation          https://xcb.freedesktop.org/windowcontextandmanipulation/
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 // The following code and features are in no way representative of what AquariWM is designed to be,
 // nor what it will be for much longer. It is simply a test, to see what the implementation of
