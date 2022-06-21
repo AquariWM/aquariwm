@@ -20,28 +20,28 @@ headers at the beginning of all relevant files. If the file format in question d
 support comments, please include a `LICENSE` file in the same directory with the
 plain-text version of this header.
 
-### Rust (and others with C-style comments)
+### Rust, and others with C-like comments
 ```rust
 // This Source Code Form is subject to the terms of the Mozilla Public
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 ```
 
-### Shell scripts, and other languages
+### Shell scripts, and others
 ```bash
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 ```
 
-### Markdown, HTML, and other languages
+### Markdown, HTML, and other markup languages
 ```markdown
 <!-- This Source Code Form is subject to the terms of the Mozilla Public
    - License, v. 2.0. If a copy of the MPL was not distributed with this
    - file, You can obtain one at https://mozilla.org/MPL/2.0/. -->
 ```
 
-### Others - plain text
+### `LICENSE` files, and others
 ```
 This Source Code Form is subject to the terms of the Mozilla Public
 License, v. 2.0. If a copy of the MPL was not distributed with this
