@@ -11,7 +11,7 @@ repository and build the code locally if you wish to contribute or test that whi
 completed so far.
 
 
-## Contributing
+## [Contributing](CONTRIBUTING.md)
 Contributions to AquariWM are heavily appreciated and encouraged!  AquariWM aims to be a very
 community-oriented project, and we believe that that should mean AquariWM is owned and developed
 by the community too.  You can find more information about contributing to AquariWM in the
