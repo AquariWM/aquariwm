@@ -55,16 +55,23 @@ language of choice for AquariWM's core.
 
 ## Whitespace and indentation
  - **Lines of code have a strict maximum length of 99 characters,** except where absolutely
-   necessary. Your editor may automatically configure this option when opening the AquariWM
-   project.
+   necessary.   
+   > Your editor may automatically configure this option when opening the AquariWM project.
+
  - **Use 4 spaces for indentation, not tab characters.** We understand that there are accessibility
    issues that may be encountered with the use of spaces instead of tabs, but we must unfortunately
    stick with spaces so as to follow more general guidelines for the Rust language. You may
    configure your own tools that let you view 4-space indentation differently, or that can convert
    this indentation to tab characters while editing, and then back to 4 spaces when submitting.
- - **No trailing whitespace at the end of lines** (if a line only contains `x`, then it should be,
-   in total, just `x` [rather than `x `, for example]).
- - **No trailing whitespace should be used at the end of files**, including blank lines.
+   > Your editor should automatically configure this option when opening the AquariWM project.
+
+ - **No trailing whitespace at the end of lines.** If a line only contains `x`, then it should be,
+   in total, just `x` (rather than `x `, i.e. a trailing space, for example).
+   > Your editor should automatically configure this option when opening the AquariWM project.
+
+ - **No trailing whitespace should be used at the end of files**, including blank lines.   
+   > Some editors do this automatically, but hide it within the editor. Please make sure to check
+   the diff when submitting your Pull Request and manually remove trailing lines if necessary.
 
 More information regarding whitespace can be found in
 [the Rust code style guidelines](https://doc.rust-lang.org/1.0.0/style/style/whitespace.html).
