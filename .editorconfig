@@ -56,7 +56,7 @@ root = true
 # where fixed-width tabs may prove a problem, that they explore other tools at their disposal. For
 # example, if there may be tools that can visually resize indentation while keeping the number of
 # spaces, or tools that can change the number of spaces *only* when editing files, not when saving.
-indent_style = space
+indent_style = tab
 indent_size = 4
 
 # While this is not part of Rust's official style guide, AquariWM is a project that primarily
