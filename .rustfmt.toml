@@ -1,1 +1,8 @@
+# This configures ˋrustfmtˋ (typically accessed via ˋcargo fmtˋ) to format Rust
+# code to use hard tab characters for indentation, rather than spaces.
+#
+# If you would like to learn more about why this is preferred in AquariWM, or
+# you would like to discuss the decision, please check out the pinned
+# discussion about hard tabs that can be found under the 'Discussions' tab of
+# the AquariWM project's GitHub repository (AquariWM/aquariwm).
 hard_tabs = true
