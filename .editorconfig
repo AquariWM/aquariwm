@@ -7,55 +7,27 @@
 # should use when editing a particular project. This is useful so that a style guide can be
 # maintained throughout the project.
 
-# The code style used in AquariWM is the official Rust language style guide, and it can be
-# summarised as the following:
+# AquariWM uses the Rust programming language's code style guidelines throughout the project, with
+# the following exceptions:
+# - 'Hard' tab characters must be used for indentation, NOT spaces. Spaces, however, should be
+#   used for the alignment of text, like in comments, for example.
+# - If a language other than Rust is being programmed in, and that language has its own code style
+#   guidelines, then those code style guidelines should be applied first. Any code style
+#   guidelines from Rust that do not contridict the guidelines of the specific language being used
+#   should also apply.
+# - If another language than Rust is being used, then these exceptions still apply. That means all
+#   languages where it is _possible_ to use hard tab characters instead of spaces should have hard
+#   tab characters applied, for example.
 #
-#     -   Use line comments (//) instead of block comments (/* and */).
-#     -   Lines must not exceed 99 characters in length.
-#     -   Use 4 spaces for indentation, not tabs.
-#     -   No trailing whitespace at the end of lines and files.
-#     -   Use spaces around operators, e.g. `a * b`, not `a*b`.
-#     -   Use a space after colons and commas, e.g. `a: Bar` and `a, b`, not `a:bar` or `a,b`.
-#     -   Use a space after the opening and before the closing brace in single line blocks ({ a }).
-#     -   For multiline function signatures, each line should align with the first parameter.
-#         For example:
-#
-#     `   fn foo(a: Bar, b: Bar,
-#     `          c: Bar, d: Bar)
-#     `          -> Bar {
-#
-#     -   Do not use extra whitespace in a line to provide alignment. For example:
-#
-#     `   let a = 0;
-#     `   let longer_name = 3;
-#
-#         Instead of:
-#
-#     `   let a           = 0;
-#     `   let longer_name = 3;
-#
-#     -   In general, naming conventions are the following:
-#
-#         Type-level constructs:    CamelCase
-#         Value-level constructs:   snake_case
-#         Constants:                SCREAMING_SNAKE_CASE
-#
-# More information about Rust's style guide can be found at:
-#     https://doc.rust-lang.org/1.0.0/style/style/README.html
-#
-# We recommend that you read the 'Rust book' (The Rust Programming Language) to learn Rust, it has
-# proved a very, very well-written resource for both novices and experts alike. You can find it for
-# free online at:
-#     https://doc.rust-lang.org/stable/book/
+# You can learn more about the code style guidelines used in AquariWM in the contributors' section
+# of the AquariWM wiki, which you can find on its GitHub repository 'AquariWM/aquariwm'.
 
 # This declares that this is the .editorconfig file for the whole project, i.e. the root.
 root = true
 
-# This configures the indentation style to match Rust's official style guide. We recognise that
-# this is not ideal for all users for accessibility reasons, and we recommend that for such users
-# where fixed-width tabs may prove a problem, that they explore other tools at their disposal. For
-# example, if there may be tools that can visually resize indentation while keeping the number of
-# spaces, or tools that can change the number of spaces *only* when editing files, not when saving.
+# This configures editors to use hard tab characters for indentation, rather than spaces. The
+# reasoning for this choice can be found and discussed in the pinned discussion regarding hard tab
+# indentation in the AquariWM project's GitHub repository under the 'Discussions' tab.
 indent_style = tab
 indent_size = 4
 
