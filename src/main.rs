@@ -31,7 +31,7 @@
 // AquariWM core move the focused window based on those coordinates received over IPC.
 
 fn main() {
-    // stub
+	// stub
 }
 
 // Window managers in X are simply clients that have permission to perform substructure redirection
