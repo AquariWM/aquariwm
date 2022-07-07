@@ -30,14 +30,26 @@
 // IPC socket to AquariWM with information on where to put the focused window, and then have the
 // AquariWM core move the focused window based on those coordinates received over IPC.
 
-fn main() {
-	// stub
+fn main() -> xcb::Result<()> {
+	// connect to the X server
+	let (conn, screen) = xcb::Connection::connect(None)?;
+
+	// register for SUBSTRUCTURE_NOTIFY and SUBSTRUCTURE_REDIRECT on the root window...
+
+	Ok(())
 }
 
 // Window managers in X are simply clients that have permission to perform substructure redirection
 // on the root window. Only one such client can be active at once. Start by informing X that we
 // would like to select input on the root window for the substrcuture redirect mask and the
 // substructure notify mask.
+//
+// Potentially helpful example code (Rust, XCB):
+// https://github.com/mjkillough/lanta/blob/4c31f087514502f243eb15ac0f1a57072aa8779c/src/x.rs#L173
+//
+// xcb::EVENT_MASK_SUBSTRUCTURE_NOTIFY
+// xcb::EVENT_MASK_SUBSTRUCTURE_REDIRECT
+// (substructure redirect on root window with xcb::change_window_attributes_checked)
 
 // Start by telling X what we want to receive events for. We want to receive input events for
 // cursor movement (motion events), Super + Left Mouse Button, Super + Right Mouse Button, and
