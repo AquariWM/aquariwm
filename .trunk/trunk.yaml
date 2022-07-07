@@ -1,0 +1,16 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+version: 0.1
+cli:
+  version: 0.14.1-beta
+lint:
+  enabled:
+    - actionlint@1.6.15
+    - clippy@1.58.1
+    - gitleaks@8.8.11
+    - markdownlint@0.31.1
+    - prettier@2.7.1
+    - rustfmt@1.58.1
+    - taplo@release-taplo-cli-0.6.8
