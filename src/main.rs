@@ -32,13 +32,19 @@
 
 fn main() -> xcb::Result<()> {
 	// connect to the X server
-	let (conn, screen) = xcb::Connection::connect(None)?;
+	let (conn, screen_num) = xcb::Connection::connect(None)?;
 
-	// Window managers in X are simply clients that have permission to perform substructure redirection
-	// on the root window. Only one such client can be active at once. Start by informing X that we
-	// would like to select input on the root window for the substrcuture redirect mask and the
-	// substructure notify mask.
-	//
+	// Get the `x::Screen` object from the connection's `x::Setup` with the `screen_num`.
+	let screen = conn.get_setup().roots().nth(screen_num as usize).unwrap();
+	// Get the screen's root window.
+	let _root = screen.root();
+
+	// The concept of a 'window manager' in X is simply a client that has permission to perform
+	// substructure redirection on the root window. Only one X client is allowed to do this at
+	// once. We therefore register for substructure redirection on the root window:
+
+	// register for substructure redirection on the root window...
+
 	// Potentially helpful example code (Rust, XCB):
 	// https://github.com/mjkillough/lanta/blob/4c31f087514502f243eb15ac0f1a57072aa8779c/src/x.rs#L173
 	//
@@ -46,9 +52,9 @@ fn main() -> xcb::Result<()> {
 	// xcb::EVENT_MASK_SUBSTRUCTURE_REDIRECT
 	// (substructure redirect on root window with xcb::change_window_attributes_checked)
 
-	// Start by telling X what we want to receive events for. We want to receive input events for
-	// cursor movement (motion events), Super + Left Mouse Button, Super + Right Mouse Button, and
-	// Super + f.
+	// Next, we want to tell X what events we want to know about. We need to receive input events
+	// relating to cursor movement (motion events), Super + Left Mouse Button,
+	// Super + Right Mouse Button, and Super + f.
 
 	// select mouse motion input
 	// grab Super + Left Mouse Button
