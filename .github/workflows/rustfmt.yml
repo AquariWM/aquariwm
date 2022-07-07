@@ -33,6 +33,7 @@ jobs:
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1.0.6
         with:
+          toolchain: stable
           profile: minimal
           components: rustfmt
 
