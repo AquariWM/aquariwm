@@ -11,7 +11,7 @@ name: rustfmt apply code style
 #       content permissions...
 permissions:
   contents: write
-    pull-requests: write
+  pull-requests: write
 
 # Format code pushed or submitted in a pull request to the project.
 on:
