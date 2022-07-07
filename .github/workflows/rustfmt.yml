@@ -1,0 +1,41 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+# This is a custom GitHub Actions workflow created by the AquariWM project. It may be used in
+# accordance with its MPLv2.0 license.
+
+name: rustfmt apply code style
+
+# TODO: Not sure if it needs the write permissions on pull-requests or whether that's covered by
+#       content permissions...
+permissions:
+	contents: write
+	pull-requests: write
+
+# Format code pushed or submitted in a pull request to the project.
+on:
+	push:
+		branches: [ "main" ]
+	pull_request:
+		branches: [ "main" ]
+
+jobs:
+	rustfmt:
+		name: Format code with rustfmt
+		runs-on: ubuntu-latest
+		steps:
+			# Checkout the code from the GitHub repository so it can be read by rustfmt.
+			-   name: Checkout code
+				uses: actions/checkout@v3
+
+			# Install the Rust toolchain (with rustfmt) so that cargo can be used to format the code.
+			-   name: Install Rust toolchain
+				uses: actions-rs/toolchain@v1.0.6
+				with:
+					profile: minimal
+					components: rustfmt
+
+			# Run `cargo fmt` to automatically format Rust code according to the style guidelines.
+			-   name: Run rustfmt
+				run: cargo fmt --verbose
