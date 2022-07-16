@@ -61,6 +61,42 @@ fn main() -> xcb::Result<()> {
 	// grab Super + Right Mouse Button
 	// grab Super + f
 
+	// https://docs.rs/xcb/latest/xcb/x/struct.GrabPointer.html 
+	// owner_events		bool		if owner_events is true, pointer input events will still be
+	//   							'processed' in the selected window, in this case the root
+	//								window.
+	// grab_window		Window		the window being grabbed, which is the root window in our
+	//								case.
+	// event_mask		EventMask	the event mask(s) to be reported to the window manager. ones
+	//								that interest us include 'ENTER_WINDOW' (for 'XEnterNotify'),
+	//								'BUTTON1_MOTION' (for left click and drag; maybe we can also
+	//								apply a key modifier mask to it or something so that we
+	//								directly grab 'Super + Left Click Drag'?), 'BUTTON3_MOTION'
+	//								(which is the same thing but for right click), and
+	//								'POINTER_MOTION' (motion of the pointer in general, hopefully
+	//								not needed).
+	// pointer_mode		GrabMode	whether to grab pointer input in synchronous mode or
+	//								asynchronous mode. synchronous mode freezes the pointer input
+	//								until we allow it again, asynchronous lets it continue as
+	//								normal. has use for, for example, waiting until a certain
+	//								setup action has been completed by the window manager, but is
+	//								not the same as owner_events.
+	// keyboard_mode	GrabMode	the same as pointer_mode, just in relation to keyboard input.
+	// confine_to		Window		if set to a window other than 'XCB_NONE', this specifies a
+	//								window which the user is not allowed to move the cursor
+	//								outside of.
+	// cursor			Cursor		specifies the cursor to be displayed (e.g. the hand icon when
+	//								hovering over a link); maybe something like a resize cursor
+	//								resizing a window? to not change the cursor, we can use
+	//								'XCB_NONE'.
+	// time				Timestamp	clients are given preference when grabbing based on this
+	//								value. 'XCB_CURRENT_TIME' will be replaced by the current
+	//								time. as we are a window manager, surely we want to always
+	//								be first? or maybe no one else can even do it on the root
+	//								window? I don't know, I want to let other clients to grab the
+	//								pointer too, just send the events over to them after the
+	//								manager has handled them, if appropriate...
+
 	// event loop {
 	// //
 	// // mouse motion {
