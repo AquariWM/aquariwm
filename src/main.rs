@@ -109,5 +109,11 @@ fn main() -> xcb::Result<()> {
 	// //
 	// }
 
-	Ok(())
+	// main event loop
+	loop {
+		match conn.wait_for_event()? {
+			_ => {}
+		}
+	}
+
 }
