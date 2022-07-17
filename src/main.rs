@@ -133,6 +133,9 @@ fn main() -> xcb::Result<()> {
 	// main event loop
 	loop {
 		match conn.wait_for_event()? {
+			// this is the main event loop. in here, we receive the latest event (wait_for_event
+			// is an iterator) and match against different event types to determine how, or if, to
+			// react.
 			_ => {}
 		}
 	}
