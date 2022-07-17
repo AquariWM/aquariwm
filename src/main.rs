@@ -96,18 +96,39 @@ fn main() -> xcb::Result<()> {
 	//                              window? I don't know, I want to let other clients to grab the
 	//                              pointer too, just send the events over to them after the
 	//                              manager has handled them, if appropriate...
-
-	// event loop {
-	// //
-	// // mouse motion {
-	// // // if (hovered window != focused window) focus(hovered window)
-	// // }
-	// //
-	// // Super + Left Mouse Button -> move window
-	// // Super + Right Mouse Button -> resize window
-	// // Super + F -> toggle fullscreen on the window
-	// //
-	// }
+	//
+	// enter window pointer grab
+	// =========================
+	// owner_events = true
+	// grab_window = root
+	// event_mask = ENTER_WINDOW
+	// pointer_mode = async
+	// keyboard_mode = async
+	// confine_to = XCB_NONE
+	// cursor = XCB_NONE
+	// time = XCB_CURRENT_TIME
+	//
+	// button 1 drag pointer grab (need to require super somehow)
+	// ==========================
+	// owner_events = false
+	// grab_window = root
+	// event_mask = BUTTON1_MOTION
+	// pointer_mode = async
+	// keyboard_mode = async
+	// confine_to = XCB_NONE
+	// cursor = idk move or something
+	// time = XCB_CURRENT_TIME
+	
+	// button 2 drag pointer grab (need to require super somehow)
+	// ==========================
+	// owner_events = false
+	// grab_window = root
+	// event_mask = BUTTON2_MOTION
+	// pointer_mode = async
+	// keyboard_mode = async
+	// confine_to = XCB_NONE
+	// cursor = idk move or something
+	// time = XCB_CURRENT_TIME
 
 	// main event loop
 	loop {
