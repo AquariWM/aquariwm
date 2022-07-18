@@ -23,18 +23,32 @@ fn main() -> xcb::Result<()> {
 
 	// Get the `x::Screen` object from the connection's `x::Setup` with the `screen_num`.
 	let screen = conn.get_setup().roots().nth(screen_num as usize).unwrap();
+
 	// Get the screen's root window.
 	let root = screen.root();
 
+	// Request substructure redirection on the root window.
+	conn.send_request(&x::ChangeWindowAttributes {
+		window: root,
+		value_list: &[x::Cw::EventMask(
+			x::EventMask::SUBSTRUCTURE_REDIRECT | x::EventMask::SUBSTRUCTURE_NOTIFY,
+		)],
+	});
+
+	// As the substructure redirection request is not checked, we must flush the connection.
+	conn.flush()?;
+
 	// Send a request asking to receive events relating to the cursor motion when the cursor
 	// enters a new window.
-	let _enter_window_cookie = conn.send_request(&x::GrabPointer {
+	let enter_window_cookie = conn.send_request(&x::GrabPointer {
 		// we still want pointer events to be processed as usual
 		owner_events: true,
 		// we want to hear about pointer events on the root window (and all its children)
 		grab_window: root,
 		// we want to hear when the pointer enters a new window, so we can change focus
-		event_mask: x::EventMask::ENTER_WINDOW,
+		// ON SECOND THOUGHT: I don't think ENTER_WINDOW is applicable to the pointer? Not quite
+		//                    sure, replaced it with POINTER_MOTION for now.
+		event_mask: x::EventMask::POINTER_MOTION,
 		// async grab mode means that the events being grabbed are not frozen when we grab them
 		pointer_mode: x::GrabMode::Async,
 		keyboard_mode: x::GrabMode::Async,
@@ -45,14 +59,27 @@ fn main() -> xcb::Result<()> {
 		time: x::CURRENT_TIME,
 	});
 
+	// We wait for all the replies to be received at once, so that there is no need to be waiting
+	// when we can be sending the other requests. As there is no reply from substructure
+	// redirection, there is only one such reply for the moment.
+	conn.wait_for_reply(enter_window_cookie)?;
+
 	// This is the main event loop. In here, we wait until an event is sent to AquariWM by the X
 	// server, and then, based on the event received, we choose to react accordingly, or not at
 	// all.
 	loop {
-		match conn.wait_for_event()? {
-			xcb::Event::X(x::Event::MotionNotify(event)) => {
-				// print the coordinates of the pointer when pointer motion is received
-				println!(event.root_x() + ", " + event.root_y());
+		// Receive the next event from the X server, when available.
+		let event = conn.wait_for_event()?;
+
+		// trunk-ignore(clippy/single_match)
+		match event {
+			xcb::Event::X(x::Event::MotionNotify(motion)) => {
+				// Print the coordinates of the cursor when it enters a new window.
+				println!(
+					"The cursor position is {}, {}.",
+					motion.root_x(),
+					motion.root_y()
+				);
 			}
 			_ => {}
 		}
