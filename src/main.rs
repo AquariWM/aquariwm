@@ -34,7 +34,7 @@ fn main() -> xcb::Result<()> {
 	conn.flush()?;
 
 	// Send a request asking to receive events relating to the cursor motion.
-	let enter_window_cookie = conn.send_request(&x::GrabPointer {
+	let cookie = conn.send_request(&x::GrabPointer {
 		// we still want pointer events to be processed as usual
 		owner_events: true,
 		// we want to hear about pointer events on the root window (and all its children)
@@ -54,7 +54,7 @@ fn main() -> xcb::Result<()> {
 	// We wait for all the replies to be received at once, so that there is no need to be waiting
 	// when we can be sending the other requests. As there is no reply from substructure
 	// redirection, there is only one such reply for the moment.
-	conn.wait_for_reply(enter_window_cookie)?;
+	conn.wait_for_reply(cookie)?;
 
 	// This is the main event loop. In here, we wait until an event is sent to AquariWM by the X
 	// server, and then, based on the event received, we choose to react accordingly, or not at
