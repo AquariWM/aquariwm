@@ -11,6 +11,11 @@
 
 use xcb::x;
 
+/// A primitive base window manager implementation for AquariWM to build upon.
+/// This is not the proper implementation of AquariWM and its module system, but rather a very
+/// basic floating window manager that can be built upon in time. It supports the basic
+/// functions of moving windows, resizing windows, focusing a particular window, and toggling
+/// fullscreen for the focused window.
 fn main() -> xcb::Result<()> {
 	// Connect to the X server.
 	let (conn, screen_num) = xcb::Connection::connect(None)?;
