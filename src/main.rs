@@ -15,6 +15,8 @@
 // the code below isn't representative of the features of AquariWM... this is simply a test
 // implementation so I can make sure the basics all work and to get some experience with them.
 
+use xcb::x;
+
 fn main() -> xcb::Result<()> {
 	// connect to the X server
 	let (conn, screen_num) = xcb::Connection::connect(None)?;
@@ -28,21 +30,21 @@ fn main() -> xcb::Result<()> {
 	// event masks... I think this might supposed to be combined into one request, possibly even
 	// needs to be to function? not sure, this is pretty much pseudocode right now I guess...
 
-	let enter_window_cookie = conn.send_request(&xcb::x::GrabPointer {
+	let enter_window_cookie = conn.send_request(&x::GrabPointer {
 		// we still want pointer events to be processed as usual
 		owner_events: true,
 		// we want to hear about pointer events on the root window (and all its children)
 		grab_window: root,
 		// we want to hear when the pointer enters a new window, so we can change focus
-		event_mask: xcb::x::EventMask::ENTER_WINDOW,
+		event_mask: x::EventMask::ENTER_WINDOW,
 		// async grab mode means that the events being grabbed are not frozen when we grab them
-		pointer_mode: xcb::x::GrabMode::Async,
-		keyboard_mode: xcb::x::GrabMode::Async,
+		pointer_mode: x::GrabMode::Async,
+		keyboard_mode: x::GrabMode::Async,
 		// we don't want to confine the cursor to be only within a particular window
-		confine_to: xcb::x::WINDOW_NONE,
+		confine_to: x::WINDOW_NONE,
 		// we don't want to overwrite the appearance of the cursor
-		cursor: xcb::x::CURSOR_NONE,
-		time: xcb::x::CURRENT_TIME,
+		cursor: x::CURSOR_NONE,
+		time: x::CURRENT_TIME,
 	});
 
 	// for these button1 and button3 pointer grabs, we only actually need to receive the
@@ -53,30 +55,30 @@ fn main() -> xcb::Result<()> {
 	// click-and-drags, but only react when the super key is pressed. I'm not sure which is best
 	// right now.
 
-	let button1_cookie = conn.send_request(&xcb::x::GrabPointer {
+	let button1_cookie = conn.send_request(&x::GrabPointer {
 		// when moving a window, we don't actually want anything else to receive the drag inputs
 		owner_events: false,
 		grab_window: root,
 		// button1 is the primary mouse button, typically known as the left mouse button
-		event_mask: xcb::x::EventMask::BUTTON1_MOTION,
-		pointer_mode: xcb::x::GrabMode::Async,
-		keyboard_mode: xcb::x::GrabMode::Async,
-		confine_to: xcb::x::WINDOW_NONE,
-		cursor: xcb::x::CURSOR_NONE,
-		time: xcb::x::CURRENT_TIME,
+		event_mask: x::EventMask::BUTTON1_MOTION,
+		pointer_mode: x::GrabMode::Async,
+		keyboard_mode: x::GrabMode::Async,
+		confine_to: x::WINDOW_NONE,
+		cursor: x::CURSOR_NONE,
+		time: x::CURRENT_TIME,
 	});
 
-	let button3_cookie = conn.send_request(&xcb::x::GrabPointer {
+	let button3_cookie = conn.send_request(&x::GrabPointer {
 		owner_events: false,
 		grab_window: root,
 		// button3 is actually the secondary mouse button, a.k.a. right mouse button, as the
 		// middle mouse button is the scroll wheel
-		event_mask: xcb::x::EventMask::BUTTON3_MOTION,
-		pointer_mode: xcb::x::GrabMode::Async,
-		keyboard_mode: xcb::x::GrabMode::Async,
-		confine_to: xcb::x::WINDOW_NONE,
-		cursor: xcb::x::CURSOR_NONE,
-		time: xcb::x::CURRENT_TIME,
+		event_mask: x::EventMask::BUTTON3_MOTION,
+		pointer_mode: x::GrabMode::Async,
+		keyboard_mode: x::GrabMode::Async,
+		confine_to: x::WINDOW_NONE,
+		cursor: x::CURSOR_NONE,
+		time: x::CURRENT_TIME,
 	});
 
 	// only after sending out the requests do we wait for their replies. we don't want to waste
