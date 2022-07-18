@@ -6,14 +6,11 @@
 
 // There are a number of resources that you may find helpful when writing this first stub.
 //
-// rust-xcb documentation           https://rust-x-bindings.github.io/rust-xcb/xcb/index.html
-// rust-xcb github                  https://github.com/rust-x-bindings/rust-xcb
 // how to write a window manager----
 //              https://jich4n.com/posts/how-x-window-managers-work-and-how-to-write-one-part-i/
 // ICCCM                            https://tronche.com/gui/x/icccm/
 // EWMH                             https://specifications.freedesktop.org/wm-spec/latest/
 // tinywm, a helpful reference      http://incise.org/tinywm.html
-// the rust programming book        https://doc.rust-lang.org/stable/book/
 // XCB tutorial                     https://xcb.freedesktop.org/tutorial/
 // XCB window manipulation          https://xcb.freedesktop.org/windowcontextandmanipulation/
 
@@ -37,7 +34,7 @@ fn main() -> xcb::Result<()> {
 	// Get the `x::Screen` object from the connection's `x::Setup` with the `screen_num`.
 	let screen = conn.get_setup().roots().nth(screen_num as usize).unwrap();
 	// Get the screen's root window.
-	let _root = screen.root();
+	let root = screen.root();
 
 	// The concept of a 'window manager' in X is simply a client that has permission to perform
 	// substructure redirection on the root window. Only one X client is allowed to do this at
@@ -96,39 +93,58 @@ fn main() -> xcb::Result<()> {
 	//                              window? I don't know, I want to let other clients to grab the
 	//                              pointer too, just send the events over to them after the
 	//                              manager has handled them, if appropriate...
-	//
-	// enter window pointer grab
-	// =========================
-	// owner_events = true
-	// grab_window = root
-	// event_mask = ENTER_WINDOW
-	// pointer_mode = async
-	// keyboard_mode = async
-	// confine_to = XCB_NONE
-	// cursor = XCB_NONE
-	// time = XCB_CURRENT_TIME
-	//
-	// button 1 drag pointer grab (need to require super somehow)
-	// ==========================
-	// owner_events = false
-	// grab_window = root
-	// event_mask = BUTTON1_MOTION
-	// pointer_mode = async
-	// keyboard_mode = async
-	// confine_to = XCB_NONE
-	// cursor = idk move or something
-	// time = XCB_CURRENT_TIME
-	
-	// button 2 drag pointer grab (need to require super somehow)
-	// ==========================
-	// owner_events = false
-	// grab_window = root
-	// event_mask = BUTTON2_MOTION
-	// pointer_mode = async
-	// keyboard_mode = async
-	// confine_to = XCB_NONE
-	// cursor = idk move or something
-	// time = XCB_CURRENT_TIME
+    
+    // send out requests to grab the pointer for the ENTER_WINDOW, BUTTON1_MOTION, BUTTON2_MOTION
+    // event masks... I think this might supposed to be combined into one request, possibly even
+    // needs to be to function? not sure, this is pretty much pseudocode right now I guess.
+
+    let enter_window_cookie = conn.send_request(&x::GrabPointer {
+        owner_events: true,
+        grab_window: root,
+        event_mask: x::EventMask::ENTER_WINDOW,
+        pointer_mode: x::GrabMode::Async,
+        keyboard_mode: x::GrabMode::Async,
+        confine_to: x::Window::none(),
+        cursor,
+        time: x::CURRENT_TIME,
+    });
+
+    // for these button1 and button3 pointer grabs, we only actually need to receive the
+    // information when the super key (also known as the meta key, windows key, command key, GUI
+    // key, etc.) is pressed. perhaps that can be specified as part of the request? or maybe we
+    // only grab the pointer when the super key is pressed, and ungrab it when it is released... or
+    // maybe it doesn't matter, and we can be perfectly fine to just receive all of the
+    // click-and-drags, but only react when the super key is pressed. I'm not sure which is best
+    // right now.
+
+    let button1_cookie = conn.send_request(&x::GrabPointer {
+        owner_events: false,
+        grab_window: root,
+        event_mask: x::EventMask::BUTTON1_MOTION,
+        pointer_mode: x::GrabMode::Async,
+        keyboard_mode: x::GrabMode::Async,
+        confine_to: x::Window::none(),
+        cursor,
+        time: x::CURRENT_TIME,
+    });	
+
+    let button3_cookie = conn.send_request(&x::GrabPointer {
+        owner_events: false,
+        grab_window: root,
+        event_mask: x::EventMask::BUTTON3_MOTION,
+        pointer_mode: x::GrabMode::Async,
+        keyboard_mode: x::GrabMode::Async,
+        confine_to: x::Window::none(),
+        cursor,
+        time: x::CURRENT_TIME,
+    });	
+
+    // only after sending out the requests do we wait for their replies. we don't want to waste
+    // time waiting for one reply when we could be sending another request!
+
+    let _enter_window_reply = conn.wait_for_reply(enter_window_cookie)?;
+    let _button1_reply = conn.wait_for_reply(button1_cookie)?;
+    let _button3_reply = conn.wait_for_reply(button3_cookie)?;
 
 	// main event loop
 	loop {
