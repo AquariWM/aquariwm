@@ -93,58 +93,58 @@ fn main() -> xcb::Result<()> {
 	//                              window? I don't know, I want to let other clients to grab the
 	//                              pointer too, just send the events over to them after the
 	//                              manager has handled them, if appropriate...
-    
-    // send out requests to grab the pointer for the ENTER_WINDOW, BUTTON1_MOTION, BUTTON2_MOTION
-    // event masks... I think this might supposed to be combined into one request, possibly even
-    // needs to be to function? not sure, this is pretty much pseudocode right now I guess.
 
-    let enter_window_cookie = conn.send_request(&x::GrabPointer {
-        owner_events: true,
-        grab_window: root,
-        event_mask: x::EventMask::ENTER_WINDOW,
-        pointer_mode: x::GrabMode::Async,
-        keyboard_mode: x::GrabMode::Async,
-        confine_to: x::Window::none(),
-        cursor,
-        time: x::CURRENT_TIME,
-    });
+	// send out requests to grab the pointer for the ENTER_WINDOW, BUTTON1_MOTION, BUTTON2_MOTION
+	// event masks... I think this might supposed to be combined into one request, possibly even
+	// needs to be to function? not sure, this is pretty much pseudocode right now I guess.
 
-    // for these button1 and button3 pointer grabs, we only actually need to receive the
-    // information when the super key (also known as the meta key, windows key, command key, GUI
-    // key, etc.) is pressed. perhaps that can be specified as part of the request? or maybe we
-    // only grab the pointer when the super key is pressed, and ungrab it when it is released... or
-    // maybe it doesn't matter, and we can be perfectly fine to just receive all of the
-    // click-and-drags, but only react when the super key is pressed. I'm not sure which is best
-    // right now.
+	let enter_window_cookie = conn.send_request(&x::GrabPointer {
+		owner_events: true,
+		grab_window: root,
+		event_mask: x::EventMask::ENTER_WINDOW,
+		pointer_mode: x::GrabMode::Async,
+		keyboard_mode: x::GrabMode::Async,
+		confine_to: x::Window::none(),
+		cursor,
+		time: x::CURRENT_TIME,
+	});
 
-    let button1_cookie = conn.send_request(&x::GrabPointer {
-        owner_events: false,
-        grab_window: root,
-        event_mask: x::EventMask::BUTTON1_MOTION,
-        pointer_mode: x::GrabMode::Async,
-        keyboard_mode: x::GrabMode::Async,
-        confine_to: x::Window::none(),
-        cursor,
-        time: x::CURRENT_TIME,
-    });	
+	// for these button1 and button3 pointer grabs, we only actually need to receive the
+	// information when the super key (also known as the meta key, windows key, command key, GUI
+	// key, etc.) is pressed. perhaps that can be specified as part of the request? or maybe we
+	// only grab the pointer when the super key is pressed, and ungrab it when it is released... or
+	// maybe it doesn't matter, and we can be perfectly fine to just receive all of the
+	// click-and-drags, but only react when the super key is pressed. I'm not sure which is best
+	// right now.
 
-    let button3_cookie = conn.send_request(&x::GrabPointer {
-        owner_events: false,
-        grab_window: root,
-        event_mask: x::EventMask::BUTTON3_MOTION,
-        pointer_mode: x::GrabMode::Async,
-        keyboard_mode: x::GrabMode::Async,
-        confine_to: x::Window::none(),
-        cursor,
-        time: x::CURRENT_TIME,
-    });	
+	let button1_cookie = conn.send_request(&x::GrabPointer {
+		owner_events: false,
+		grab_window: root,
+		event_mask: x::EventMask::BUTTON1_MOTION,
+		pointer_mode: x::GrabMode::Async,
+		keyboard_mode: x::GrabMode::Async,
+		confine_to: x::Window::none(),
+		cursor,
+		time: x::CURRENT_TIME,
+	});
 
-    // only after sending out the requests do we wait for their replies. we don't want to waste
-    // time waiting for one reply when we could be sending another request!
+	let button3_cookie = conn.send_request(&x::GrabPointer {
+		owner_events: false,
+		grab_window: root,
+		event_mask: x::EventMask::BUTTON3_MOTION,
+		pointer_mode: x::GrabMode::Async,
+		keyboard_mode: x::GrabMode::Async,
+		confine_to: x::Window::none(),
+		cursor,
+		time: x::CURRENT_TIME,
+	});	
 
-    let _enter_window_reply = conn.wait_for_reply(enter_window_cookie)?;
-    let _button1_reply = conn.wait_for_reply(button1_cookie)?;
-    let _button3_reply = conn.wait_for_reply(button3_cookie)?;
+	// only after sending out the requests do we wait for their replies. we don't want to waste
+	// time waiting for one reply when we could be sending another request!
+
+	let _enter_window_reply = conn.wait_for_reply(enter_window_cookie)?;
+	let _button1_reply = conn.wait_for_reply(button1_cookie)?;
+	let _button3_reply = conn.wait_for_reply(button3_cookie)?;
 
 	// main event loop
 	loop {
