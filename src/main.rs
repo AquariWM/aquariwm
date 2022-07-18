@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 // Specifications relevant to AquariWM that it should follow where possible and reasonable:
-// ICCCM                            https://tronche.com/gui/x/icccm/
-// EWMH                             https://specifications.freedesktop.org/wm-spec/latest/
+// ICCCM    https://tronche.com/gui/x/icccm/
+// EWMH     https://specifications.freedesktop.org/wm-spec/latest/
 
 // The code below isn't representative of the features of AquariWM, this is simply a test
 // implementation so I can make sure the basics all work and to get some experience with them.
@@ -12,16 +12,16 @@
 use xcb::x;
 
 fn main() -> xcb::Result<()> {
-	// connect to the X server
+	// Connect to the X server.
 	let (conn, screen_num) = xcb::Connection::connect(None)?;
 
-	// Get the `x::Screen` object from the connection's `x::Setup` with the `screen_num`.
+	// Get the relevant screen and root window from the connection object using the `screen_num`
+	// provided by `xcb::Connection::connect`.
 	let screen = conn.get_setup().roots().nth(screen_num as usize).unwrap();
-
-	// Get the screen's root window.
 	let root = screen.root();
 
 	// Request substructure redirection on the root window.
+	// TODO: error handling for when a window manager is already running
 	conn.send_request(&x::ChangeWindowAttributes {
 		window: root,
 		value_list: &[x::Cw::EventMask(
@@ -35,18 +35,18 @@ fn main() -> xcb::Result<()> {
 
 	// Send a request asking to receive events relating to the cursor motion.
 	let cookie = conn.send_request(&x::GrabPointer {
-		// we still want pointer events to be processed as usual
+		// We still want pointer events to be processed as usual.
 		owner_events: true,
-		// we want to hear about pointer events on the root window (and all its children)
+		// We want to hear about pointer events on the root window (and all its children).
 		grab_window: root,
-		// we want to hear about the movement of the pointer
+		// We want to hear about the movement of the pointer.
 		event_mask: x::EventMask::POINTER_MOTION,
-		// async grab mode means that the events being grabbed are not frozen when we grab them
+		// Async grab mode means that the events being grabbed are not frozen when we grab them.
 		pointer_mode: x::GrabMode::Async,
 		keyboard_mode: x::GrabMode::Async,
-		// we don't want to confine the cursor to be only within a particular window
+		// We don't want to confine the cursor to be only within a particular window.
 		confine_to: x::WINDOW_NONE,
-		// we don't want to overwrite the appearance of the cursor
+		// We don't want to overwrite the appearance of the cursor.
 		cursor: x::CURSOR_NONE,
 		time: x::CURRENT_TIME,
 	});
@@ -81,8 +81,7 @@ fn main() -> xcb::Result<()> {
 					],
 				});
 
-				// As the configure request is not checked, we flush the connection to ensure the
-				// configure request is sent to the X server.
+				// Flush the connection manually, as there is no reply.
 				conn.flush()?;
 			}
 			// Map windows after creation.
@@ -120,6 +119,7 @@ fn main() -> xcb::Result<()> {
 					motion.root_y()
 				);
 			}
+			// Ignore any other events.
 			_ => {}
 		}
 	}
