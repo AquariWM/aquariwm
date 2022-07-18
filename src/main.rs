@@ -20,6 +20,16 @@ fn main() -> xcb::Result<()> {
 	// Connect to the X server.
 	let (conn, screen_num) = xcb::Connection::connect(None)?;
 
+	// Set up the window manager, i.e. register for substructure redirection on the root window
+	// and grab other relevant events.
+	setup(&conn, screen_num)?;
+
+	// Run the event loop and return its value (that's why the semicolon is missing).
+	run(conn)
+}
+
+/// Set up the window manager and register for various events with the X server.
+fn setup(conn: &xcb::Connection, screen_num: i32) -> xcb::Result<()> {
 	// Get the relevant screen and root window from the connection object using the `screen_num`
 	// provided by `xcb::Connection::connect`.
 	let screen = conn.get_setup().roots().nth(screen_num as usize).unwrap();
@@ -63,8 +73,7 @@ fn main() -> xcb::Result<()> {
 	//       to flush if it is possible.
 	conn.wait_for_reply(cookie)?;
 
-	// Run the event loop and return its value (that's why the semicolon is missing).
-	run(conn)
+	Ok(())
 }
 
 /// The main event loop of the window manager, where it handles received events.
