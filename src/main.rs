@@ -35,19 +35,17 @@ fn main() -> xcb::Result<()> {
 		)],
 	});
 
-	// As the substructure redirection request is not checked, we must flush the connection.
+	// As the substructure redirection request is not checked, we must flush the connection to
+	// make the X server aware of our request.
 	conn.flush()?;
 
-	// Send a request asking to receive events relating to the cursor motion when the cursor
-	// enters a new window.
+	// Send a request asking to receive events relating to the cursor motion.
 	let enter_window_cookie = conn.send_request(&x::GrabPointer {
 		// we still want pointer events to be processed as usual
 		owner_events: true,
 		// we want to hear about pointer events on the root window (and all its children)
 		grab_window: root,
-		// we want to hear when the pointer enters a new window, so we can change focus
-		// ON SECOND THOUGHT: I don't think ENTER_WINDOW is applicable to the pointer? Not quite
-		//                    sure, replaced it with POINTER_MOTION for now.
+		// we want to hear about the movement of the pointer
 		event_mask: x::EventMask::POINTER_MOTION,
 		// async grab mode means that the events being grabbed are not frozen when we grab them
 		pointer_mode: x::GrabMode::Async,
@@ -68,18 +66,60 @@ fn main() -> xcb::Result<()> {
 	// server, and then, based on the event received, we choose to react accordingly, or not at
 	// all.
 	loop {
-		// Receive the next event from the X server, when available.
-		let event = conn.wait_for_event()?;
+		// Receive the next event from the X server, when available, and match against its type.
+		match conn.wait_for_event()? {
+			// Honor window configure requests completely, for now.
+			xcb::Event::X(x::Event::ConfigureRequest(req)) => {
+				// As we have registered for substructure redirection on the root window, it is
+				// now our job to respond to requests made by other clients. The X server was
+				// doing a perfectly fine job for our current needs though, so we'll just send it
+				// right back, just as before.
+				conn.send_request(&x::ConfigureWindow {
+					window: req.window(),
+					value_list: &[
+						x::ConfigWindow::X(req.x().into()),
+						x::ConfigWindow::Y(req.y().into()),
+						x::ConfigWindow::Width(req.width().into()),
+						x::ConfigWindow::Height(req.height().into()),
+						x::ConfigWindow::BorderWidth(req.border_width().into()),
+						x::ConfigWindow::Sibling(req.sibling()),
+						x::ConfigWindow::StackMode(req.stack_mode()),
+					],
+				});
 
-		// trunk-ignore(clippy/single_match)
-		match event {
-			// Now, at the moment, the window manager is not functional because we have asked the
-			// X server to redirect events for the root window to us right? Well, that means it's
-			// now our job to, well, manage the windows. We must react to various requests made by
-			// client windows. For now, we'll simply honor the requests (listen for the required
-			// types, and just send them straight over to the X server with the same parameters).
+				// As the configure request is not checked, we flush the connection to ensure the
+				// configure request is sent to the X server.
+				conn.flush()?;
+			}
+			// Map windows after creation.
+			xcb::Event::X(x::Event::MapRequest(req)) => {
+				// In the real window manager, this is where the decorator module would come in.
+				// The decorator module's job would be to populate a frame around the window with
+				// window decorations, such as a title bar, a close button, etc. We would first
+				// ask the decorator module if it even wants to decorate the window in particular,
+				// I mean, no point in creating a frame for a window that doesn't need one. If the
+				// decorator module wants to decorate the window, we can create a new frame window
+				// with the appropriate position and size given by the layout module, and then ask
+				// the decorator module to do its thing. The decorator module would send us a reply
+				// indicating the area left, free from decoration, to place the real window within.
+				// We would  register for substructure redirection on the frame window (as
+				// substructure redirection only applies to direct children, and this would make
+				// the real window a direct child of the frame window, instead of the root window),
+				// and then reparent the real window to this frame window. Finally, after all that,
+				// we could map the frame window and the real window on top.
+				//
+				// We're not actually doing any of that right now though. Now we're just mapping
+				// the 'real window' directly with no window decorations.
+
+				conn.send_request(&x::MapWindow {
+					window: req.window(),
+				});
+
+				// Flush the connection.
+				conn.flush()?;
+			}
+			// Print the cursor position.
 			xcb::Event::X(x::Event::MotionNotify(motion)) => {
-				// Print the coordinates of the cursor when it enters a new window.
 				println!(
 					"The cursor position is {}, {}.",
 					motion.root_x(),
