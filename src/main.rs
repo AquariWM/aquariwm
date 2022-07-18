@@ -2,17 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-// Some potentially helpful reference resources:
-//
-// how to write a window manager----
-//              https://jich4n.com/posts/how-x-window-managers-work-and-how-to-write-one-part-i/
+// Specifications relevant to AquariWM that it should follow where possible and reasonable:
 // ICCCM                            https://tronche.com/gui/x/icccm/
 // EWMH                             https://specifications.freedesktop.org/wm-spec/latest/
-// tinywm, a helpful reference      http://incise.org/tinywm.html
-// XCB tutorial                     https://xcb.freedesktop.org/tutorial/
-// XCB window manipulation          https://xcb.freedesktop.org/windowcontextandmanipulation/
 
-// the code below isn't representative of the features of AquariWM... this is simply a test
+// The code below isn't representative of the features of AquariWM, this is simply a test
 // implementation so I can make sure the basics all work and to get some experience with them.
 
 use xcb::x;
