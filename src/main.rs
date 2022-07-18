@@ -61,6 +61,14 @@ fn main() -> xcb::Result<()> {
 	// redirection, there is only one such reply for the moment.
 	conn.wait_for_reply(cookie)?;
 
+	run(conn)
+}
+
+/// The main event loop of the window manager, where it handles received events.
+/// The event loop waits until the program receives a new event from the X server, and then, based
+/// on the event type received, it reacts accordingly (sending new requests to the X server when
+/// necessary).
+fn run(conn: xcb::Connection) -> xcb::Result<()> {
 	// This is the main event loop. In here, we wait until an event is sent to AquariWM by the X
 	// server, and then, based on the event received, we choose to react accordingly, or not at
 	// all.
