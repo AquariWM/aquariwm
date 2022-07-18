@@ -104,7 +104,7 @@ fn main() -> xcb::Result<()> {
 		event_mask: xcb::x::EventMask::ENTER_WINDOW,
 		pointer_mode: xcb::x::GrabMode::Async,
 		keyboard_mode: xcb::x::GrabMode::Async,
-		confine_to: xcb::x::Window::none(),
+		confine_to: xcb::x::WINDOW_NONE,
 		cursor: xcb::x::CURSOR_NONE,
 		time: xcb::x::CURRENT_TIME,
 	});
@@ -123,7 +123,7 @@ fn main() -> xcb::Result<()> {
 		event_mask: xcb::x::EventMask::BUTTON1_MOTION,
 		pointer_mode: xcb::x::GrabMode::Async,
 		keyboard_mode: xcb::x::GrabMode::Async,
-		confine_to: xcb::x::Window::none(),
+		confine_to: xcb::x::WINDOW_NONE,
 		cursor: xcb::x::CURSOR_NONE,
 		time: xcb::x::CURRENT_TIME,
 	});
@@ -134,7 +134,7 @@ fn main() -> xcb::Result<()> {
 		event_mask: xcb::x::EventMask::BUTTON3_MOTION,
 		pointer_mode: xcb::x::GrabMode::Async,
 		keyboard_mode: xcb::x::GrabMode::Async,
-		confine_to: xcb::x::Window::none(),
+		confine_to: xcb::x::WINDOW_NONE,
 		cursor: xcb::x::CURSOR_NONE,
 		time: xcb::x::CURRENT_TIME,
 	});
