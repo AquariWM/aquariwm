@@ -46,33 +46,6 @@ fn setup(conn: &xcb::Connection, screen_num: i32) -> xcb::Result<()> {
 
 	// Flush the queued request to the X server.
 	conn.flush()?;
-
-	// Send a request asking to receive events relating to the cursor motion.
-	let cookie = conn.send_request(&x::GrabPointer {
-		// We still want pointer events to be processed as usual.
-		owner_events: true,
-		// We want to hear about pointer events on the root window (and all its children).
-		grab_window: root,
-		// We want to hear about the movement of the pointer.
-		event_mask: x::EventMask::POINTER_MOTION,
-		// Async grab mode means that the events being grabbed are not frozen when we grab them.
-		pointer_mode: x::GrabMode::Async,
-		keyboard_mode: x::GrabMode::Async,
-		// We don't want to confine the cursor to be only within a particular window.
-		confine_to: x::WINDOW_NONE,
-		// We don't want to overwrite the appearance of the cursor.
-		cursor: x::CURSOR_NONE,
-		time: x::CURRENT_TIME,
-	});
-
-	// We wait for all the replies to be received at once, so that there is no need to be waiting
-	// when we can be sending the other requests. As there is no reply from substructure
-	// redirection, there is only one such reply for the moment.
-	// TODO: do we have to wait for the reply? perhaps we can flush the connection just like when
-	//       we aren't expecting any reply? since we do nothing with the reply, it might be better
-	//       to flush if it is possible.
-	conn.wait_for_reply(cookie)?;
-
 	Ok(())
 }
 
