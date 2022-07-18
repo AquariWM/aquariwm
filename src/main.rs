@@ -6,7 +6,7 @@
 // ICCCM    https://tronche.com/gui/x/icccm/
 // EWMH     https://specifications.freedesktop.org/wm-spec/latest/
 
-mod handlers;
+pub mod handlers;
 
 use xcb::x;
 
@@ -16,23 +16,23 @@ use xcb::x;
 /// basic floating window manager that can be built upon in time. It supports the basic
 /// functions of moving windows, resizing windows, focusing a particular window, and toggling
 /// fullscreen for the focused window.
-fn main() -> xcb::Result<()> {
+pub fn main() -> xcb::Result<()> {
 	// Connect to the X server.
 	let (conn, screen_num) = xcb::Connection::connect(None)?;
 
 	// Set up the window manager, i.e. register for substructure redirection on the root window
 	// and grab other relevant events.
-	setup(&conn, screen_num)?;
+	setup(&conn, screen_num as usize)?;
 
 	// Run the event loop and return its value (that's why the semicolon is missing).
 	run(conn)
 }
 
 /// Set up the window manager and register for various events with the X server.
-fn setup(conn: &xcb::Connection, screen_num: i32) -> xcb::Result<()> {
+fn setup(conn: &xcb::Connection, screen_num: usize) -> xcb::Result<()> {
 	// Get the relevant screen and root window from the connection object using the `screen_num`
 	// provided by `xcb::Connection::connect`.
-	let screen = conn.get_setup().roots().nth(screen_num as usize).unwrap();
+	let screen = conn.get_setup().roots().nth(screen_num).unwrap();
 	let root = screen.root();
 
 	// Request substructure redirection on the root window.
@@ -58,11 +58,23 @@ fn run(conn: xcb::Connection) -> xcb::Result<()> {
 	loop {
 		// Receive the next event from the X server, when available, and match against its type.
 		match conn.wait_for_event()? {
+			xcb::Event::X(x::Event::CreateNotify(notif)) => {
+				handlers::on_create(&conn, notif)?;
+			}
 			xcb::Event::X(x::Event::ConfigureRequest(req)) => {
 				handlers::on_configure(&conn, req)?;
 			}
 			xcb::Event::X(x::Event::MapRequest(req)) => {
 				handlers::on_map(&conn, req)?;
+			}
+			xcb::Event::X(x::Event::EnterNotify(notif)) => {
+				handlers::on_window_enter(&conn, notif)?;
+			}
+			xcb::Event::X(x::Event::FocusIn(notif)) => {
+				handlers::on_window_focused(&conn, notif)?;
+			}
+			xcb::Event::X(x::Event::FocusOut(notif)) => {
+				handlers::on_window_unfocused(&conn, notif)?;
 			}
 			// Ignore any other events.
 			_ => {}

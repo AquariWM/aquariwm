@@ -2,7 +2,35 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use xcb::x;
+use xcb::{x, Connection};
+
+/// Respond to the creation of a new window.
+///
+/// This function is called after a new window has already been created. We use it to request to
+/// grab the pointer on the new window for the `ENTER_WINDOW` event mask, so we can focus the
+/// window when the pointer enters it.
+pub fn on_create(conn: &Connection, notif: x::CreateNotifyEvent) -> xcb::Result<()> {
+	// Register for the window manager to receive events relating to the mouse pointer entering
+	// the client window.
+	conn.send_request(&x::GrabPointer {
+		// Continue to let the window process events as usual.
+		owner_events: true,
+		// Grab pointer 'enter window' events for the client window.
+		grab_window: notif.window(),
+		event_mask: x::EventMask::ENTER_WINDOW,
+		// Don't freeze pointer and keyboard input events.
+		pointer_mode: x::GrabMode::Async,
+		keyboard_mode: x::GrabMode::Async,
+		// Don't restrict the cursor to any particular window.
+		confine_to: x::WINDOW_NONE,
+		// Don't modify the appearance of the cursor.
+		cursor: x::CURSOR_NONE,
+		time: x::CURRENT_TIME,
+	});
+
+	conn.flush()?;
+	Ok(())
+}
 
 /// Handle a client's request to configure a window.
 ///
@@ -10,7 +38,7 @@ use xcb::x;
 /// Currently, we simply send the exact same request back to the X server with no changes, but we
 /// may wish to modify this request in the future. X clients must accept any modification we make
 /// to their requests.
-pub fn on_configure(conn: &xcb::Connection, req: x::ConfigureRequestEvent) -> xcb::Result<()> {
+pub fn on_configure(conn: &Connection, req: x::ConfigureRequestEvent) -> xcb::Result<()> {
 	// We simply send an identical request back to the X server. The numerical units received here
 	// must be converted with `.into()` as the size of integer received in the `ConfigureRequest`
 	// is smaller than that which the X server expects.
@@ -35,7 +63,7 @@ pub fn on_configure(conn: &xcb::Connection, req: x::ConfigureRequestEvent) -> xc
 ///
 /// Here we simply 'bounce back' a MapRequest to the X server, but in the future we can create a
 /// frame window here and reparent the client window to it so that window decorations can exist.
-pub fn on_map(conn: &xcb::Connection, req: x::MapRequestEvent) -> xcb::Result<()> {
+pub fn on_map(conn: &Connection, req: x::MapRequestEvent) -> xcb::Result<()> {
 	// In the real window manager, this is where the decorator module would come in. The decorator
 	// module's job would be to populate a frame around the window with window decorations, such
 	// as a title bar, a close button, etc. We would first ask the decorator module if it even
@@ -55,6 +83,42 @@ pub fn on_map(conn: &xcb::Connection, req: x::MapRequestEvent) -> xcb::Result<()
 
 	conn.send_request(&x::MapWindow {
 		window: req.window(),
+	});
+
+	conn.flush()?;
+	Ok(())
+}
+
+/// Focus a window when the pointer enters it.
+pub fn on_window_enter(conn: &Connection, notif: x::EnterNotifyEvent) -> xcb::Result<()> {
+	// Focus the window and revert the focus to the parent window if the window is hidden or
+	// destroyed.
+	conn.send_request(&x::SetInputFocus {
+		revert_to: x::InputFocus::Parent,
+		focus: notif.event(),
+		time: x::CURRENT_TIME,
+	});
+
+	conn.flush()?;
+	Ok(())
+}
+
+/// When a window is focused, bring it to the front.
+pub fn on_window_focused(conn: &Connection, notif: x::FocusInEvent) -> xcb::Result<()> {
+	conn.send_request(&x::ConfigureWindow {
+		window: notif.event(),
+		value_list: &[x::ConfigWindow::StackMode(x::StackMode::Above)],
+	});
+
+	conn.flush()?;
+	Ok(())
+}
+
+/// When a window is unfocused, put it back below.
+pub fn on_window_unfocused(conn: &Connection, notif: x::FocusOutEvent) -> xcb::Result<()> {
+	conn.send_request(&x::ConfigureWindow {
+		window: notif.event(),
+		value_list: &[x::ConfigWindow::StackMode(x::StackMode::Below)],
 	});
 
 	conn.flush()?;
