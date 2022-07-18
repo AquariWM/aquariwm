@@ -58,7 +58,7 @@ fn main() -> xcb::Result<()> {
 	// grab Super + Right Mouse Button
 	// grab Super + f
 
-	// https://docs.rs/xcb/latest/xcb/x/struct.GrabPointer.html 
+	// https://docs.rs/xcb/latest/xcb/x/struct.GrabPointer.html
 	// owner_events     bool        if owner_events is true, pointer input events will still be
 	//                              'processed' in the selected window, in this case the root
 	//                              window.
@@ -101,12 +101,12 @@ fn main() -> xcb::Result<()> {
 	let enter_window_cookie = conn.send_request(&x::GrabPointer {
 		owner_events: true,
 		grab_window: root,
-		event_mask: x::EventMask::ENTER_WINDOW,
-		pointer_mode: x::GrabMode::Async,
-		keyboard_mode: x::GrabMode::Async,
-		confine_to: x::Window::none(),
-		cursor,
-		time: x::CURRENT_TIME,
+		event_mask: xcb::x::EventMask::ENTER_WINDOW,
+		pointer_mode: xcb::x::GrabMode::Async,
+		keyboard_mode: xcb::x::GrabMode::Async,
+		confine_to: xcb::x::Window::none(),
+		cursor: xcb::x::CURSOR_NONE,
+		time: xcb::x::CURRENT_TIME,
 	});
 
 	// for these button1 and button3 pointer grabs, we only actually need to receive the
@@ -120,24 +120,24 @@ fn main() -> xcb::Result<()> {
 	let button1_cookie = conn.send_request(&x::GrabPointer {
 		owner_events: false,
 		grab_window: root,
-		event_mask: x::EventMask::BUTTON1_MOTION,
-		pointer_mode: x::GrabMode::Async,
-		keyboard_mode: x::GrabMode::Async,
-		confine_to: x::Window::none(),
-		cursor,
-		time: x::CURRENT_TIME,
+		event_mask: xcb::x::EventMask::BUTTON1_MOTION,
+		pointer_mode: xcb::x::GrabMode::Async,
+		keyboard_mode: xcb::x::GrabMode::Async,
+		confine_to: xcb::x::Window::none(),
+		cursor: xcb::x::CURSOR_NONE,
+		time: xcb::x::CURRENT_TIME,
 	});
 
 	let button3_cookie = conn.send_request(&x::GrabPointer {
 		owner_events: false,
 		grab_window: root,
-		event_mask: x::EventMask::BUTTON3_MOTION,
-		pointer_mode: x::GrabMode::Async,
-		keyboard_mode: x::GrabMode::Async,
-		confine_to: x::Window::none(),
-		cursor,
-		time: x::CURRENT_TIME,
-	});	
+		event_mask: xcb::x::EventMask::BUTTON3_MOTION,
+		pointer_mode: xcb::x::GrabMode::Async,
+		keyboard_mode: xcb::x::GrabMode::Async,
+		confine_to: xcb::x::Window::none(),
+		cursor: xcb::x::CURSOR_NONE,
+		time: xcb::x::CURRENT_TIME,
+	});
 
 	// only after sending out the requests do we wait for their replies. we don't want to waste
 	// time waiting for one reply when we could be sending another request!
@@ -155,5 +155,4 @@ fn main() -> xcb::Result<()> {
 			_ => {}
 		}
 	}
-
 }
