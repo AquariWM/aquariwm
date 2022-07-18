@@ -98,7 +98,7 @@ fn main() -> xcb::Result<()> {
 	// event masks... I think this might supposed to be combined into one request, possibly even
 	// needs to be to function? not sure, this is pretty much pseudocode right now I guess.
 
-	let enter_window_cookie = conn.send_request(&x::GrabPointer {
+	let enter_window_cookie = conn.send_request(&xcb::x::GrabPointer {
 		owner_events: true,
 		grab_window: root,
 		event_mask: xcb::x::EventMask::ENTER_WINDOW,
@@ -117,7 +117,7 @@ fn main() -> xcb::Result<()> {
 	// click-and-drags, but only react when the super key is pressed. I'm not sure which is best
 	// right now.
 
-	let button1_cookie = conn.send_request(&x::GrabPointer {
+	let button1_cookie = conn.send_request(&xcb::x::GrabPointer {
 		owner_events: false,
 		grab_window: root,
 		event_mask: xcb::x::EventMask::BUTTON1_MOTION,
@@ -128,7 +128,7 @@ fn main() -> xcb::Result<()> {
 		time: xcb::x::CURRENT_TIME,
 	});
 
-	let button3_cookie = conn.send_request(&x::GrabPointer {
+	let button3_cookie = conn.send_request(&xcb::x::GrabPointer {
 		owner_events: false,
 		grab_window: root,
 		event_mask: xcb::x::EventMask::BUTTON3_MOTION,
