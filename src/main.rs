@@ -26,11 +26,9 @@ fn main() -> xcb::Result<()> {
 	// Get the screen's root window.
 	let root = screen.root();
 
-	// send out requests to grab the pointer for the ENTER_WINDOW, BUTTON1_MOTION, BUTTON2_MOTION
-	// event masks... I think this might supposed to be combined into one request, possibly even
-	// needs to be to function? not sure, this is pretty much pseudocode right now I guess...
-
-	let enter_window_cookie = conn.send_request(&x::GrabPointer {
+	// Send a request asking to receive events relating to the cursor motion when the cursor
+	// enters a new window.
+	let _enter_window_cookie = conn.send_request(&x::GrabPointer {
 		// we still want pointer events to be processed as usual
 		owner_events: true,
 		// we want to hear about pointer events on the root window (and all its children)
@@ -47,53 +45,15 @@ fn main() -> xcb::Result<()> {
 		time: x::CURRENT_TIME,
 	});
 
-	// for these button1 and button3 pointer grabs, we only actually need to receive the
-	// information when the super key (also known as the meta key, windows key, command key, GUI
-	// key, etc.) is pressed. perhaps that can be specified as part of the request? or maybe we
-	// only grab the pointer when the super key is pressed, and ungrab it when it is released... or
-	// maybe it doesn't matter, and we can be perfectly fine to just receive all of the
-	// click-and-drags, but only react when the super key is pressed. I'm not sure which is best
-	// right now.
-
-	let button1_cookie = conn.send_request(&x::GrabPointer {
-		// when moving a window, we don't actually want anything else to receive the drag inputs
-		owner_events: false,
-		grab_window: root,
-		// button1 is the primary mouse button, typically known as the left mouse button
-		event_mask: x::EventMask::BUTTON1_MOTION,
-		pointer_mode: x::GrabMode::Async,
-		keyboard_mode: x::GrabMode::Async,
-		confine_to: x::WINDOW_NONE,
-		cursor: x::CURSOR_NONE,
-		time: x::CURRENT_TIME,
-	});
-
-	let button3_cookie = conn.send_request(&x::GrabPointer {
-		owner_events: false,
-		grab_window: root,
-		// button3 is actually the secondary mouse button, a.k.a. right mouse button, as the
-		// middle mouse button is the scroll wheel
-		event_mask: x::EventMask::BUTTON3_MOTION,
-		pointer_mode: x::GrabMode::Async,
-		keyboard_mode: x::GrabMode::Async,
-		confine_to: x::WINDOW_NONE,
-		cursor: x::CURSOR_NONE,
-		time: x::CURRENT_TIME,
-	});
-
-	// only after sending out the requests do we wait for their replies. we don't want to waste
-	// time waiting for one reply when we could be sending another request!
-
-	let _enter_window_reply = conn.wait_for_reply(enter_window_cookie)?;
-	let _button1_reply = conn.wait_for_reply(button1_cookie)?;
-	let _button3_reply = conn.wait_for_reply(button3_cookie)?;
-
-	// main event loop
+	// This is the main event loop. In here, we wait until an event is sent to AquariWM by the X
+	// server, and then, based on the event received, we choose to react accordingly, or not at
+	// all.
 	loop {
 		match conn.wait_for_event()? {
-			// this is the main event loop. in here, we receive the latest event (wait_for_event
-			// is an iterator) and match against different event types to determine how, or if, to
-			// react.
+			xcb::Event::X(x::Event::MotionNotify(event)) => {
+				// print the coordinates of the pointer when pointer motion is received
+				println!(event.root_x() + ", " + event.root_y());
+			}
 			_ => {}
 		}
 	}
