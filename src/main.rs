@@ -73,6 +73,11 @@ fn main() -> xcb::Result<()> {
 
 		// trunk-ignore(clippy/single_match)
 		match event {
+			// Now, at the moment, the window manager is not functional because we have asked the
+			// X server to redirect events for the root window to us right? Well, that means it's
+			// now our job to, well, manage the windows. We must react to various requests made by
+			// client windows. For now, we'll simply honor the requests (listen for the required
+			// types, and just send them straight over to the X server with the same parameters).
 			xcb::Event::X(x::Event::MotionNotify(motion)) => {
 				// Print the coordinates of the cursor when it enters a new window.
 				println!(
