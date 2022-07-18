@@ -6,9 +6,6 @@
 // ICCCM    https://tronche.com/gui/x/icccm/
 // EWMH     https://specifications.freedesktop.org/wm-spec/latest/
 
-// The code below isn't representative of the features of AquariWM, this is simply a test
-// implementation so I can make sure the basics all work and to get some experience with them.
-
 mod handlers;
 
 use xcb::x;
