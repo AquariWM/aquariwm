@@ -4,16 +4,7 @@
 
 use xcb::{x, Connection};
 
-use crate::setup::register_window;
-
-/// Respond to the creation of a new window.
-///
-/// This function is called after a new window has already been created. We use it to request to
-/// grab the pointer on the new window for the `ENTER_WINDOW` event mask, so we can focus the
-/// window when the pointer enters it.
-pub fn on_create(conn: &Connection, notif: x::CreateNotifyEvent) -> xcb::Result<()> {
-	register_window(conn, notif.window())
-}
+use crate::setup;
 
 /// Handle a client's request to configure a window.
 ///
@@ -28,11 +19,11 @@ pub fn on_configure(conn: &Connection, req: x::ConfigureRequestEvent) -> xcb::Re
 	conn.send_request(&x::ConfigureWindow {
 		window: req.window(),
 		value_list: &[
-			x::ConfigWindow::X(req.x().into()),
-			x::ConfigWindow::Y(req.y().into()),
-			x::ConfigWindow::Width(req.width().into()),
-			x::ConfigWindow::Height(req.height().into()),
-			x::ConfigWindow::BorderWidth(req.border_width().into()),
+			x::ConfigWindow::X(req.x() as i32),
+			x::ConfigWindow::Y(req.y() as i32),
+			x::ConfigWindow::Width(req.width() as u32),
+			x::ConfigWindow::Height(req.height() as u32),
+			x::ConfigWindow::BorderWidth(req.border_width() as u32),
 			x::ConfigWindow::Sibling(req.sibling()),
 			x::ConfigWindow::StackMode(req.stack_mode()),
 		],
@@ -67,6 +58,10 @@ pub fn on_map(conn: &Connection, req: x::MapRequestEvent) -> xcb::Result<()> {
 	conn.send_request(&x::MapWindow {
 		window: req.window(),
 	});
+
+	// We just mapped the window - no need to determine if the window is mapped or not, we can
+	// just register the events for it.
+	setup::register_mapped_window(conn, &req.window())?;
 
 	conn.flush()?;
 	Ok(())

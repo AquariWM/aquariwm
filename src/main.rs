@@ -9,7 +9,6 @@
 pub mod handlers;
 pub mod setup;
 
-use setup::setup;
 use xcb::x;
 
 /// A primitive base window manager implementation for AquariWM to build upon.
@@ -24,7 +23,7 @@ pub fn main() -> xcb::Result<()> {
 
 	// Set up the window manager, i.e. register for substructure redirection on the root window
 	// and grab other relevant events.
-	setup(&conn, screen_num as usize)?;
+	setup::init(&conn, screen_num as usize)?;
 
 	// Run the event loop and return its value (that's why the semicolon is missing).
 	run(conn)
@@ -39,9 +38,6 @@ fn run(conn: xcb::Connection) -> xcb::Result<()> {
 	loop {
 		// Receive the next event from the X server, when available, and match against its type.
 		match conn.wait_for_event()? {
-			xcb::Event::X(x::Event::CreateNotify(notif)) => {
-				handlers::on_create(&conn, notif)?;
-			}
 			xcb::Event::X(x::Event::ConfigureRequest(req)) => {
 				handlers::on_configure(&conn, req)?;
 			}
