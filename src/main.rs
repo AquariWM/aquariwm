@@ -7,7 +7,9 @@
 // EWMH     https://specifications.freedesktop.org/wm-spec/latest/
 
 pub mod handlers;
+pub mod setup;
 
+use setup::setup;
 use xcb::x;
 
 /// A primitive base window manager implementation for AquariWM to build upon.
@@ -26,27 +28,6 @@ pub fn main() -> xcb::Result<()> {
 
 	// Run the event loop and return its value (that's why the semicolon is missing).
 	run(conn)
-}
-
-/// Set up the window manager and register for various events with the X server.
-fn setup(conn: &xcb::Connection, screen_num: usize) -> xcb::Result<()> {
-	// Get the relevant screen and root window from the connection object using the `screen_num`
-	// provided by `xcb::Connection::connect`.
-	let screen = conn.get_setup().roots().nth(screen_num).unwrap();
-	let root = screen.root();
-
-	// Request substructure redirection on the root window.
-	// TODO: error handling for when a window manager is already running
-	conn.send_request(&x::ChangeWindowAttributes {
-		window: root,
-		value_list: &[x::Cw::EventMask(
-			x::EventMask::SUBSTRUCTURE_REDIRECT | x::EventMask::SUBSTRUCTURE_NOTIFY,
-		)],
-	});
-
-	// Flush the queued request to the X server.
-	conn.flush()?;
-	Ok(())
 }
 
 /// The main event loop of the window manager, where it handles received events.
@@ -72,9 +53,6 @@ fn run(conn: xcb::Connection) -> xcb::Result<()> {
 			}
 			xcb::Event::X(x::Event::FocusIn(notif)) => {
 				handlers::on_window_focused(&conn, notif)?;
-			}
-			xcb::Event::X(x::Event::FocusOut(notif)) => {
-				handlers::on_window_unfocused(&conn, notif)?;
 			}
 			// Ignore any other events.
 			_ => {}

@@ -4,32 +4,15 @@
 
 use xcb::{x, Connection};
 
+use crate::setup::register_window;
+
 /// Respond to the creation of a new window.
 ///
 /// This function is called after a new window has already been created. We use it to request to
 /// grab the pointer on the new window for the `ENTER_WINDOW` event mask, so we can focus the
 /// window when the pointer enters it.
 pub fn on_create(conn: &Connection, notif: x::CreateNotifyEvent) -> xcb::Result<()> {
-	// Register for the window manager to receive events relating to the mouse pointer entering
-	// the client window.
-	conn.send_request(&x::GrabPointer {
-		// Continue to let the window process events as usual.
-		owner_events: true,
-		// Grab pointer 'enter window' events for the client window.
-		grab_window: notif.window(),
-		event_mask: x::EventMask::ENTER_WINDOW,
-		// Don't freeze pointer and keyboard input events.
-		pointer_mode: x::GrabMode::Async,
-		keyboard_mode: x::GrabMode::Async,
-		// Don't restrict the cursor to any particular window.
-		confine_to: x::WINDOW_NONE,
-		// Don't modify the appearance of the cursor.
-		cursor: x::CURSOR_NONE,
-		time: x::CURRENT_TIME,
-	});
-
-	conn.flush()?;
-	Ok(())
+	register_window(conn, notif.window())
 }
 
 /// Handle a client's request to configure a window.
@@ -108,17 +91,6 @@ pub fn on_window_focused(conn: &Connection, notif: x::FocusInEvent) -> xcb::Resu
 	conn.send_request(&x::ConfigureWindow {
 		window: notif.event(),
 		value_list: &[x::ConfigWindow::StackMode(x::StackMode::Above)],
-	});
-
-	conn.flush()?;
-	Ok(())
-}
-
-/// When a window is unfocused, put it back below.
-pub fn on_window_unfocused(conn: &Connection, notif: x::FocusOutEvent) -> xcb::Result<()> {
-	conn.send_request(&x::ConfigureWindow {
-		window: notif.event(),
-		value_list: &[x::ConfigWindow::StackMode(x::StackMode::Below)],
 	});
 
 	conn.flush()?;
