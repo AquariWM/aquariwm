@@ -55,14 +55,14 @@ pub fn on_map(conn: &Connection, req: x::MapRequestEvent) -> xcb::Result<()> {
 	// We're not actually doing any of that right now though. Now we're just mapping the 'real
 	// window' directly with no window decorations.
 
-	let cookie = conn.send_request(&x::MapWindow {
+	let cookie = conn.send_and_check_request(&x::MapWindow {
 		window: req.window(),
-	});
+	})?;
 
-	conn.check_request(cookie)?;
 
-	// Gotta wait for the window to be mapped first... must be something we can do with the
-	// cookie...
+
+
+
 	setup::register_mapped_window(conn, &req.window())?;
 
 	conn.flush()?;
