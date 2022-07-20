@@ -13,10 +13,15 @@ use crate::setup;
 /// may wish to modify this request in the future. X clients must accept any modification we make
 /// to their requests.
 pub fn on_configure(conn: &Connection, req: x::ConfigureRequestEvent) -> xcb::Result<()> {
+	// I understand why this is causing errors now! I didn't realise that the request received will
+	// not necessarily contain all of the possible fields. We have to check which are provided
+	// first, which we can do by comparing the value mask and various field masks with a bitwise
+	// AND.
+
 	// We simply send an identical request back to the X server. The numerical units received here
 	// must be converted with `.into()` as the size of integer received in the `ConfigureRequest`
 	// is smaller than that which the X server expects.
-	conn.send_request(&x::ConfigureWindow {
+	let cookie = conn.send_request_checked(&x::ConfigureWindow {
 		window: req.window(),
 		value_list: &[
 			x::ConfigWindow::X(req.x() as i32),
@@ -29,7 +34,7 @@ pub fn on_configure(conn: &Connection, req: x::ConfigureRequestEvent) -> xcb::Re
 		],
 	});
 
-	conn.flush()?;
+	conn.check_request(cookie).expect("Failed to configure window correctly");
 	Ok(())
 }
 
@@ -55,14 +60,17 @@ pub fn on_map(conn: &Connection, req: x::MapRequestEvent) -> xcb::Result<()> {
 	// We're not actually doing any of that right now though. Now we're just mapping the 'real
 	// window' directly with no window decorations.
 
-	let cookie = conn.send_request(&x::MapWindow {
+	// We send and check the map request because, in theory, it will cause the program to wait
+	// until a response is received (because it has to check if there was an error or not), which
+	// we need to do for registering the windows later. This is also why we don't need to flush
+	// the request: that is done automatically as part of this method call.
+	conn.send_and_check_request(&x::MapWindow {
 		window: req.window(),
-	});
+	})?;
 
-	conn.check_request(cookie)?;
-
-	// Gotta wait for the window to be mapped first... must be something we can do with the
-	// cookie...
+	// Hopefully by this point we have actually waited for the window map request to be completed
+	// before sending the requests to register for events on it (that can only be registered to
+	// mapped windows).
 	setup::register_mapped_window(conn, &req.window())?;
 
 	conn.flush()?;
