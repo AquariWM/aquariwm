@@ -58,23 +58,15 @@ pub fn init(conn: &Connection, screen_num: usize) -> xcb::Result<()> {
 		.iter()
 		.map(|child| conn.send_request(&x::GetWindowAttributes { window: *child }));
 
-	// Receive the responses to the requests. This unnecessarily waits for every reply, but it
-	// should avoid most of the overhead of the X server... has potential to be optimized if
-	// needed. You'd want to asynchronously receive the replies for all of the cookies,
-	// immediately moving on to registering events on windows as they get their respective
-	// replies.
-	let responses = cookies.map(|cookie| conn.wait_for_reply(cookie));
-
-	// Pair the responses with their corresponding windows to make it easier to associate each
-	// reply with its window.
-	let pairs = children.iter().zip(responses);
-
-	// Register to receive events on every viewable window by comparing the window attributes.
-	pairs
-		.filter(|(_, response)| response.is_ok())
-		.for_each(|(child, response)| {
+	// Receive responses for the [x::GetWindowAttributes](GetWindowAttributes) requests and
+	// register for events on each [x::MapState::Viewable](Viewable) window.
+	cookies
+		.map(|cookie| conn.wait_for_reply(cookie))
+		.zip(children)
+		.filter(|(response, _)| response.is_ok())
+		.for_each(|(response, window)| {
 			if response.unwrap().map_state() == x::MapState::Viewable {
-				register_for_events(conn, *child)
+				register_for_events(conn, *window)
 					.expect("Failed to register additional events on a pre-existing window");
 			}
 		});
