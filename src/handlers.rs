@@ -7,12 +7,10 @@ use xcb::Connection;
 
 use crate::setup;
 
-/// Handle a client's request to configure a window.
-///
-/// When the window manager receives a request to configure a window, this function is called.
-/// Currently, we simply send the exact same request back to the X server with no changes, but we
-/// may wish to modify this request in the future. X clients must accept any modification we make
-/// to their requests.
+/// Grants all client requests to configure their windows.
+/// 
+/// The window manager need not make any modifications to client `xcb::x::ConfigureWindow`
+/// requests, as any such modifications can be made by AquariWM once the window is mapped.
 pub fn on_configure(conn: &Connection, req: x::ConfigureRequestEvent) -> xcb::Result<()> {
 	// We create an array of the values from the request and their corresponding masks to make it
 	// easy to filter out the values that aren't actually contained in the request. Sending values
@@ -61,10 +59,10 @@ pub fn on_configure(conn: &Connection, req: x::ConfigureRequestEvent) -> xcb::Re
 	Ok(())
 }
 
-/// Handle a client's request to map a window, reparenting if necessary.
-///
-/// Here we simply 'bounce back' a MapRequest to the X server, but in the future we can create a
-/// frame window here and reparent the client window to it so that window decorations can exist.
+/// Grants client requests to map windows and registers extra events afterwards.
+/// 
+/// Extra events are registered on newly mapped windows with the
+/// `aquariwm::setup::register_for_events` function.
 pub fn on_map(conn: &Connection, req: x::MapRequestEvent) -> xcb::Result<()> {
 	// In the real window manager, this is where the decorator module would come in. The decorator
 	// module's job would be to populate a frame around the window with window decorations, such
@@ -83,24 +81,19 @@ pub fn on_map(conn: &Connection, req: x::MapRequestEvent) -> xcb::Result<()> {
 	// We're not actually doing any of that right now though. Now we're just mapping the 'real
 	// window' directly with no window decorations.
 
-	// We send and check the map request because, in theory, it will cause the program to wait
-	// until a response is received (because it has to check if there was an error or not), which
-	// we need to do for registering the windows later. This is also why we don't need to flush
-	// the request: that is done automatically as part of this method call.
-	conn.send_and_check_request(&x::MapWindow {
+	conn.send_request(&x::MapWindow {
 		window: req.window(),
-	})?;
+	});
 
-	// Hopefully by this point we have actually waited for the window map request to be completed
-	// before sending the requests to register for events on it (that can only be registered to
-	// mapped windows).
-	setup::register_mapped_window(conn, &req.window())?;
+	// Register for events useful to the window manager on the newly mapped window. See
+	// documentation on `aquariwm::setup::register_for_events` for more information.
+	setup::register_for_events(conn, req.window())?;
 
 	conn.flush()?;
 	Ok(())
 }
 
-/// Focus a window when the pointer enters it.
+/// Focuses the window entered by the pointer when the pointer enters a window.
 pub fn on_window_enter(conn: &Connection, notif: x::EnterNotifyEvent) -> xcb::Result<()> {
 	// Focus the window and revert the focus to the parent window if the window is hidden or
 	// destroyed.
@@ -114,7 +107,7 @@ pub fn on_window_enter(conn: &Connection, notif: x::EnterNotifyEvent) -> xcb::Re
 	Ok(())
 }
 
-/// When a window is focused, bring it to the front.
+/// Brings newly focused windows to the top of the stack.
 pub fn on_window_focused(conn: &Connection, notif: x::FocusInEvent) -> xcb::Result<()> {
 	conn.send_request(&x::ConfigureWindow {
 		window: notif.event(),

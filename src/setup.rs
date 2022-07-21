@@ -5,7 +5,7 @@
 use x::Window;
 use xcb::{x, Connection};
 
-/// Set up the window manager and register for various events with the X server.
+/// Sets up the window manager and registers for various events with the X server.
 pub fn init(conn: &Connection, screen_num: usize) -> xcb::Result<()> {
 	// Get the relevant screen and root window from the connection object using the `screen_num`
 	// provided by `xcb::Connection::connect`.
@@ -51,8 +51,8 @@ pub fn init(conn: &Connection, screen_num: usize) -> xcb::Result<()> {
 		.filter(|(_, response)| response.is_ok())
 		.for_each(|(child, response)| {
 			if response.unwrap().map_state() == x::MapState::Viewable {
-				register_mapped_window(conn, child)
-					.expect("Failed to register events on existing visible window.");
+				register_for_events(conn, *child)
+					.expect("Failed to register additional events on a pre-existing window");
 			}
 		});
 
@@ -60,27 +60,17 @@ pub fn init(conn: &Connection, screen_num: usize) -> xcb::Result<()> {
 	Ok(())
 }
 
-/// Set up a window with the window manager.
+/// Registers to receive useful events for the given window.
 ///
-/// Registers to receive events for the given window from the X server. Used to set up windows,
-/// whether that be when the window manager is first started or when a new window is created.
-pub fn register_mapped_window(conn: &Connection, window: &Window) -> xcb::Result<()> {
-	// Register for the window manager to receive events relating to the mouse pointer entering
-	// the client window.
-	conn.send_request(&x::GrabPointer {
-		// Continue to let the window process events as usual.
-		owner_events: true,
-		// Grab pointer 'enter window' events for the client window.
-		grab_window: *window,
-		event_mask: x::EventMask::ENTER_WINDOW,
-		// Don't freeze pointer and keyboard input events.
-		pointer_mode: x::GrabMode::Async,
-		keyboard_mode: x::GrabMode::Async,
-		// Don't restrict the cursor to any particular window.
-		confine_to: x::WINDOW_NONE,
-		// Don't modify the appearance of the cursor.
-		cursor: x::CURSOR_NONE,
-		time: x::CURRENT_TIME,
+/// This function is used for setting up existing mapped windows when the window manager is
+/// first launched, as well as for windows when they are mapped by the window manager at any other
+/// time. The function sends a `xcb::x::ChangeWindowAttributes` request to the X server, adding
+/// event masks for the following events:
+/// - `xcb::x::EventMask::ENTER_WINDOW`
+pub fn register_for_events(conn: &Connection, window: Window) -> xcb::Result<()> {
+	conn.send_request(&x::ChangeWindowAttributes {
+		window,
+		value_list: &[x::Cw::EventMask(x::EventMask::ENTER_WINDOW)],
 	});
 
 	Ok(())
