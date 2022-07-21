@@ -9,7 +9,7 @@ use crate::setup;
 
 /// Grants all client requests to configure their windows.
 ///
-/// The window manager need not make any modifications to client `xcb::x::ConfigureWindow`
+/// The window manager need not make any modifications to client [xcb::x::ConfigureWindow]
 /// requests, as any such modifications can be made by AquariWM once the window is mapped.
 pub fn on_configure(conn: &Connection, req: x::ConfigureRequestEvent) -> xcb::Result<()> {
 	// We create an array of the values from the request and their corresponding masks to make it
@@ -42,7 +42,7 @@ pub fn on_configure(conn: &Connection, req: x::ConfigureRequestEvent) -> xcb::Re
 
 	// The value mask sent with the request is a bitmask that tells us which fields were sent in
 	// the request, and which fields were not. To get the correct values, we filter the fields by
-	// which fields are indicated in the value mask, then map the fields to just their individual
+	// which fields are indicated in the `value_mask`, then map the fields to just their individual
 	// values. We can then collect the iterator into a list that we can easily send to the X
 	// server.
 	let values: Vec<ConfigWindow> = fields
@@ -61,8 +61,8 @@ pub fn on_configure(conn: &Connection, req: x::ConfigureRequestEvent) -> xcb::Re
 
 /// Grants client requests to map windows and registers extra events afterwards.
 ///
-/// Extra events are registered on newly mapped windows with the
-/// `aquariwm::setup::register_for_events` function.
+/// Extra events are registered on newly mapped windows with the [setup::register_for_events]
+/// function.
 pub fn on_map(conn: &Connection, req: x::MapRequestEvent) -> xcb::Result<()> {
 	// In the real window manager, this is where the decorator module would come in. The decorator
 	// module's job would be to populate a frame around the window with window decorations, such
@@ -86,7 +86,7 @@ pub fn on_map(conn: &Connection, req: x::MapRequestEvent) -> xcb::Result<()> {
 	});
 
 	// Register for events useful to the window manager on the newly mapped window. See
-	// documentation on `aquariwm::setup::register_for_events` for more information.
+	// documentation on [setup::register_for_events] for more information.
 	setup::register_for_events(conn, req.window())?;
 
 	conn.flush()?;
