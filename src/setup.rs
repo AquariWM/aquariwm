@@ -27,24 +27,6 @@ pub fn init(conn: &Connection, screen_num: usize) -> xcb::Result<()> {
 	}))
 	.expect("Uh oh! Failed to start AquariWM because there is already a window manager running");
 
-	// Grab `Super + Mouse Button` events on the root window. This is so window moving and resizing
-	// keybinds can take place.
-	// TODO: I'm not sure if this can be registered on the root window, or if it needs to be
-	//       registered on all mapped windows...
-	conn.send_request(&x::GrabButton {
-		owner_events: false,
-		grab_window: root,
-		event_mask: x::EventMask::BUTTON_PRESS
-			| x::EventMask::BUTTON_RELEASE
-			| x::EventMask::BUTTON_MOTION,
-		pointer_mode: x::GrabMode::Async,
-		keyboard_mode: x::GrabMode::Async,
-		confine_to: x::WINDOW_NONE,
-		cursor: x::CURSOR_NONE,
-		button: x::ButtonIndex::Any,
-		modifiers: x::ModMask::N4,
-	});
-
 	// Query the X server for the existing window tree so that we can perform set up on any
 	// existing windows.
 	let query = conn.send_request(&x::QueryTree { window: root });
