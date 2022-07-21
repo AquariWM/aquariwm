@@ -22,7 +22,11 @@ pub fn init(conn: &Connection, screen_num: usize) -> xcb::Result<()> {
 	conn.check_request(conn.send_request_checked(&x::ChangeWindowAttributes {
 		window: root,
 		value_list: &[x::Cw::EventMask(
-			x::EventMask::SUBSTRUCTURE_REDIRECT | x::EventMask::SUBSTRUCTURE_NOTIFY,
+			x::EventMask::SUBSTRUCTURE_REDIRECT
+				| x::EventMask::SUBSTRUCTURE_NOTIFY
+				| x::EventMask::BUTTON_PRESS
+				| x::EventMask::BUTTON_RELEASE
+				| x::EventMask::BUTTON_MOTION,
 		)],
 	}))
 	.expect("Uh oh! Failed to start AquariWM because there is already a window manager running");
