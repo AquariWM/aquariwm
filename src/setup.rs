@@ -67,6 +67,7 @@ pub fn init(conn: &Connection, screen_num: usize) -> xcb::Result<()> {
 /// time. The function sends a `xcb::x::ChangeWindowAttributes` request to the X server, adding
 /// event masks for the following events:
 /// - `xcb::x::EventMask::ENTER_WINDOW`
+/// - `xcb::x::EventMask::FOCUS_CHANGE`
 pub fn register_for_events(conn: &Connection, window: Window) -> xcb::Result<()> {
 	conn.send_request(&x::ChangeWindowAttributes {
 		window,
