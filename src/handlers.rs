@@ -2,7 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use xcb::{x, Connection};
+use xcb::x::{self, ConfigWindow, ConfigWindowMask};
+use xcb::Connection;
 
 use crate::setup;
 
@@ -13,28 +14,50 @@ use crate::setup;
 /// may wish to modify this request in the future. X clients must accept any modification we make
 /// to their requests.
 pub fn on_configure(conn: &Connection, req: x::ConfigureRequestEvent) -> xcb::Result<()> {
-	// I understand why this is causing errors now! I didn't realise that the request received will
-	// not necessarily contain all of the possible fields. We have to check which are provided
-	// first, which we can do by comparing the value mask and various field masks with a bitwise
-	// AND.
+	// We create an array of the values from the request and their corresponding masks to make it
+	// easy to filter out the values that aren't actually contained in the request. Sending values
+	// that don't actually exist obviously breaks a lot of things.
+	let fields = [
+		(ConfigWindow::X(req.x().into()), ConfigWindowMask::X),
+		(ConfigWindow::Y(req.y().into()), ConfigWindowMask::Y),
+		(
+			ConfigWindow::Width(req.width().into()),
+			ConfigWindowMask::WIDTH,
+		),
+		(
+			ConfigWindow::Height(req.height().into()),
+			ConfigWindowMask::HEIGHT,
+		),
+		(
+			ConfigWindow::BorderWidth(req.border_width().into()),
+			ConfigWindowMask::BORDER_WIDTH,
+		),
+		(
+			ConfigWindow::Sibling(req.sibling()),
+			ConfigWindowMask::SIBLING,
+		),
+		(
+			ConfigWindow::StackMode(req.stack_mode()),
+			ConfigWindowMask::STACK_MODE,
+		),
+	];
 
-	// We simply send an identical request back to the X server. The numerical units received here
-	// must be converted with `.into()` as the size of integer received in the `ConfigureRequest`
-	// is smaller than that which the X server expects.
-	let cookie = conn.send_request_checked(&x::ConfigureWindow {
+	// The value mask sent with the request is a bitmask that tells us which fields were sent in
+	// the request, and which fields were not. To get the correct values, we filter the fields by
+	// which fields are indicated in the value mask, then map the fields to just their individual
+	// values. We can then collect the iterator into a list that we can easily send to the X
+	// server.
+	let values: Vec<ConfigWindow> = fields
+		.into_iter()
+		.filter_map(|(value, mask)| req.value_mask().contains(mask).then(|| value))
+		.collect();
+
+	conn.send_request(&x::ConfigureWindow {
 		window: req.window(),
-		value_list: &[
-			x::ConfigWindow::X(req.x() as i32),
-			x::ConfigWindow::Y(req.y() as i32),
-			x::ConfigWindow::Width(req.width() as u32),
-			x::ConfigWindow::Height(req.height() as u32),
-			x::ConfigWindow::BorderWidth(req.border_width() as u32),
-			x::ConfigWindow::Sibling(req.sibling()),
-			x::ConfigWindow::StackMode(req.stack_mode()),
-		],
+		value_list: &values,
 	});
 
-	conn.check_request(cookie).expect("Failed to configure window correctly");
+	conn.flush()?;
 	Ok(())
 }
 
