@@ -9,8 +9,9 @@ use crate::setup;
 
 /// Grants all client requests to configure their windows.
 ///
-/// The window manager need not make any modifications to client [xcb::x::ConfigureWindow]
-/// requests, as any such modifications can be made by AquariWM once the window is mapped.
+/// The window manager need not make any modifications to client
+/// [xcb::x::ConfigureWindow](ConfigureWindow) requests, as any such modifications can be made by
+/// AquariWM once the window is mapped.
 pub fn on_configure(conn: &Connection, req: x::ConfigureRequestEvent) -> xcb::Result<()> {
 	// We create an array of the values from the request and their corresponding masks to make it
 	// easy to filter out the values that aren't actually contained in the request. Sending values
@@ -40,7 +41,7 @@ pub fn on_configure(conn: &Connection, req: x::ConfigureRequestEvent) -> xcb::Re
 		),
 	];
 
-	// The value mask sent with the request is a bitmask that tells us which fields were sent in
+	// The `value_mask` sent with the request is a bitmask that tells us which fields were sent in
 	// the request, and which fields were not. To get the correct values, we filter the fields by
 	// which fields are indicated in the `value_mask`, then map the fields to just their individual
 	// values. We can then collect the iterator into a list that we can easily send to the X
@@ -115,5 +116,46 @@ pub fn on_window_focused(conn: &Connection, notif: x::FocusInEvent) -> xcb::Resu
 	});
 
 	conn.flush()?;
+	Ok(())
+}
+
+/// Saves the pointer position when window position/size manipulation starts.
+pub fn on_button_press(_conn: &Connection, _notif: x::ButtonPressEvent) -> xcb::Result<()> {
+	// The window manager will have to the save the pointer position somewhere when a mouse button
+	// is pressed in combination with the `Super` key on a window. This is so that when
+	// manipulating a window's position or size, AquariWM knows where to move the window or how to
+	// change its size.
+
+	// WindowManipulation {
+	//     window: x::Window,
+	//     start_x: i16,
+	//     start_y: i16,
+	// }
+
+	// Only one window can be manipulated at one time, and it can only be manipulated in one way
+	// at a time. The current window manipulation will only cease once the relevant mouse button
+	// has been released.
+
+	Ok(())
+}
+
+/// Ends the current window manipulation if the appropriate button is released.
+///
+/// If there is currently a window manipulation occurring, and the mouse button released is the
+/// button associated with the current type of window manipulation, then the current window
+/// manipulation will finish and the information stored about the current window manipulation will
+/// be removed, thus opening up the window manager to be able to begin another window manipulation
+/// in the future, if wanted.
+pub fn on_button_release(_conn: &Connection, _notif: x::ButtonReleaseEvent) -> xcb::Result<()> {
+	Ok(())
+}
+
+/// Manipulates a window's position or size if `Super + Mouse Button` is dragged on a window.
+pub fn on_drag(_conn: &Connection, _notif: x::MotionNotifyEvent) -> xcb::Result<()> {
+	// If window manipulation (of position or size) is currently occuring, which AquariWM can keep
+	// track of with the button press events, then this function can send requests to change the
+	// position or size of the window currently being manipulated by comparing the pointer's
+	// current position to its original position when the window manipulation commenced.
+
 	Ok(())
 }

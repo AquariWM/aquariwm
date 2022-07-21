@@ -29,7 +29,8 @@ pub fn main() -> xcb::Result<()> {
 	run(conn)
 }
 
-/// The main event loop of the window manager, where it handles received events.
+/// Receives events from the X server and calls the appropriate event handlers from the
+/// [handlers] module.
 ///
 /// The event loop waits until the program receives a new event from the X server, and then, based
 /// on the event type received, it reacts accordingly (sending new requests to the X server when
@@ -49,6 +50,15 @@ fn run(conn: xcb::Connection) -> xcb::Result<()> {
 			}
 			xcb::Event::X(x::Event::FocusIn(notif)) => {
 				handlers::on_window_focused(&conn, notif)?;
+			}
+			xcb::Event::X(x::Event::ButtonPress(notif)) => {
+				handlers::on_button_press(&conn, notif)?;
+			}
+			xcb::Event::X(x::Event::ButtonRelease(notif)) => {
+				handlers::on_button_release(&conn, notif)?;
+			}
+			xcb::Event::X(x::Event::MotionNotify(notif)) => {
+				handlers::on_drag(&conn, notif)?;
 			}
 			// Ignore any other events.
 			_ => {}

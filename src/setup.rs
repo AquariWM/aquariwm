@@ -6,13 +6,14 @@ use x::Window;
 use xcb::{x, Connection};
 
 /// Sets up the window manager and registers for various events with the X server.
-/// 
-/// This function registers for the [xcb::x::EventMask::SUBSTRUCTURE_REDIRECT] and
-/// [xcb::x::EventMask::SUBSTRUCTURE_NOTIFY] events on the root window, which is what allows a
-/// window manager to manage windows.
+///
+/// This function registers for the
+/// [xcb::x::EventMask::SUBSTRUCTURE_REDIRECT](SUBSTRUCTURE_REDIRECT) and
+/// [xcb::x::EventMask::SUBSTRUCTURE_NOTIFY](SUBSTRUCTURE_NOTIFY) events on the root window, which
+/// is what allows a window manager to manage windows.
 pub fn init(conn: &Connection, screen_num: usize) -> xcb::Result<()> {
 	// Get the relevant screen and root window from the connection object using the `screen_num`
-	// provided by `xcb::Connection::connect`.
+	// provided by [xcb::Connection::connect].
 	let screen = conn.get_setup().roots().nth(screen_num).unwrap();
 	let root = screen.root();
 
@@ -24,7 +25,25 @@ pub fn init(conn: &Connection, screen_num: usize) -> xcb::Result<()> {
 			x::EventMask::SUBSTRUCTURE_REDIRECT | x::EventMask::SUBSTRUCTURE_NOTIFY,
 		)],
 	}))
-	.expect("Uh oh! Failed to start AquariWM because there is already a window manager running.");
+	.expect("Uh oh! Failed to start AquariWM because there is already a window manager running");
+
+	// Grab `Super + Mouse Button` events on the root window. This is so window moving and resizing
+	// keybinds can take place.
+	// TODO: I'm not sure if this can be registered on the root window, or if it needs to be
+	//       registered on all mapped windows...
+	conn.send_request(&x::GrabButton {
+		owner_events: false,
+		grab_window: root,
+		event_mask: x::EventMask::BUTTON_PRESS
+			| x::EventMask::BUTTON_RELEASE
+			| x::EventMask::BUTTON_MOTION,
+		pointer_mode: x::GrabMode::Async,
+		keyboard_mode: x::GrabMode::Async,
+		confine_to: x::WINDOW_NONE,
+		cursor: x::CURSOR_NONE,
+		button: x::ButtonIndex::Any,
+		modifiers: x::ModMask::N4,
+	});
 
 	// Query the X server for the existing window tree so that we can perform set up on any
 	// existing windows.
@@ -68,10 +87,10 @@ pub fn init(conn: &Connection, screen_num: usize) -> xcb::Result<()> {
 ///
 /// This function is used for setting up existing mapped windows when the window manager is
 /// first launched, as well as for windows when they are mapped by the window manager at any other
-/// time. The function sends a [xcb::x::ChangeWindowAttributes] request to the X server, adding
-/// event masks for the following events:
-/// - [xcb::x::EventMask::ENTER_WINDOW]
-/// - [xcb::x::EventMask::FOCUS_CHANGE]
+/// time. The function sends a [xcb::x::ChangeWindowAttributes](ChangeWindowAttributes) request to
+/// the X server, adding event masks for the following events:
+/// - [xcb::x::EventMask::ENTER_WINDOW](EventMask::ENTER_WINDOW)
+/// - [xcb::x::EventMask::FOCUS_CHANGE](EventMask::FOCUS_CHANGE)
 pub fn register_for_events(conn: &Connection, window: Window) -> xcb::Result<()> {
 	conn.send_request(&x::ChangeWindowAttributes {
 		window,
