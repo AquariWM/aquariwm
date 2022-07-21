@@ -8,7 +8,7 @@ use xcb::Connection;
 use crate::setup;
 
 /// Grants all client requests to configure their windows.
-/// 
+///
 /// The window manager need not make any modifications to client `xcb::x::ConfigureWindow`
 /// requests, as any such modifications can be made by AquariWM once the window is mapped.
 pub fn on_configure(conn: &Connection, req: x::ConfigureRequestEvent) -> xcb::Result<()> {
@@ -60,7 +60,7 @@ pub fn on_configure(conn: &Connection, req: x::ConfigureRequestEvent) -> xcb::Re
 }
 
 /// Grants client requests to map windows and registers extra events afterwards.
-/// 
+///
 /// Extra events are registered on newly mapped windows with the
 /// `aquariwm::setup::register_for_events` function.
 pub fn on_map(conn: &Connection, req: x::MapRequestEvent) -> xcb::Result<()> {

@@ -70,7 +70,9 @@ pub fn init(conn: &Connection, screen_num: usize) -> xcb::Result<()> {
 pub fn register_for_events(conn: &Connection, window: Window) -> xcb::Result<()> {
 	conn.send_request(&x::ChangeWindowAttributes {
 		window,
-		value_list: &[x::Cw::EventMask(x::EventMask::ENTER_WINDOW)],
+		value_list: &[x::Cw::EventMask(
+			x::EventMask::ENTER_WINDOW | x::EventMask::FOCUS_CHANGE,
+		)],
 	});
 
 	Ok(())
