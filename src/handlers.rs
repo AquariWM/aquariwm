@@ -10,7 +10,7 @@ use crate::setup;
 /// Grants all client requests to configure their windows.
 ///
 /// The window manager need not make any modifications to client
-/// [xcb::x::ConfigureWindow](ConfigureWindow) requests, as any such modifications can be made by
+/// [ConfigureWindow](xcb::x::ConfigureWindow) requests, as any such modifications can be made by
 /// AquariWM once the window is mapped.
 pub fn on_configure(conn: &Connection, req: x::ConfigureRequestEvent) -> xcb::Result<()> {
 	// We create an array of the values from the request and their corresponding masks to make it

@@ -8,8 +8,8 @@ use xcb::{x, Connection};
 /// Sets up the window manager and registers for various events with the X server.
 ///
 /// This function registers for the
-/// [xcb::x::EventMask::SUBSTRUCTURE_REDIRECT](SUBSTRUCTURE_REDIRECT) and
-/// [xcb::x::EventMask::SUBSTRUCTURE_NOTIFY](SUBSTRUCTURE_NOTIFY) events on the root window, which
+/// [SUBSTRUCTURE_REDIRECT](xcb::x::EventMask::SUBSTRUCTURE_REDIRECT) and
+/// [SUBSTRUCTURE_NOTIFY](xcb::x::EventMask::SUBSTRUCTURE_NOTIFY) events on the root window, which
 /// is what allows a window manager to manage windows.
 pub fn init(conn: &Connection, screen_num: usize) -> xcb::Result<()> {
 	// Get the relevant screen and root window from the connection object using the `screen_num`
@@ -44,8 +44,8 @@ pub fn init(conn: &Connection, screen_num: usize) -> xcb::Result<()> {
 		.iter()
 		.map(|child| conn.send_request(&x::GetWindowAttributes { window: *child }));
 
-	// Receive responses for the [x::GetWindowAttributes](GetWindowAttributes) requests and
-	// register for events on each [x::MapState::Viewable](Viewable) window.
+	// Receive responses for the [GetWindowAttributes](xcb::x::GetWindowAttributes) requests and
+	// register for events on each [Viewable](xcb::x::MapState::Viewable) window.
 	cookies
 		.map(|cookie| conn.wait_for_reply(cookie))
 		.zip(children)
@@ -65,10 +65,10 @@ pub fn init(conn: &Connection, screen_num: usize) -> xcb::Result<()> {
 ///
 /// This function is used for setting up existing mapped windows when the window manager is
 /// first launched, as well as for windows when they are mapped by the window manager at any other
-/// time. The function sends a [xcb::x::ChangeWindowAttributes](ChangeWindowAttributes) request to
+/// time. The function sends a [ChangeWindowAttributes](xcb::x::ChangeWindowAttributes) request to
 /// the X server, adding event masks for the following events:
-/// - [xcb::x::EventMask::ENTER_WINDOW](EventMask::ENTER_WINDOW)
-/// - [xcb::x::EventMask::FOCUS_CHANGE](EventMask::FOCUS_CHANGE)
+/// - [ENTER_WINDOW](xcb::x::EventMask::ENTER_WINDOW)
+/// - [FOCUS_CHANGE](xcb::x::EventMask::FOCUS_CHANGE)
 pub fn register_for_events(conn: &Connection, window: Window) -> xcb::Result<()> {
 	conn.send_request(&x::ChangeWindowAttributes {
 		window,
