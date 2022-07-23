@@ -3,15 +3,15 @@ use xcb::x::{ConfigWindow, ConfigWindowMask, ConfigureRequestEvent};
 /// Extends [ConfigWindow], allowing easy access to a field's [ConfigWindowMask].
 pub trait ConfigWindowExtensions {
 	/// Gets the [ConfigWindowMask] that corresponds with the specific [ConfigWindow] field.
-	/// 
+	///
 	/// For example:
 	/// ```
 	/// let x = x::ConfigWindow::X(req.x());
-	/// 
+	///
 	/// if req.value_mask().contains(x.mask()) {
 	///     return Some(x);
 	/// }
-	/// 
+	///
 	/// None
 	/// ```
 	fn mask(&self) -> ConfigWindowMask;
@@ -31,20 +31,19 @@ impl ConfigWindowExtensions for ConfigWindow {
 	}
 }
 
+/// Extends [ConfigureRequestEvent] for easy access to a list of the request's values.
 pub trait ConfigureRequestEventExtensions {
 	/// Creates a list of the values contained in the request that are present in the value mask.
 	///
-	/// This is useful for relaying values from the request when sending a new request,
-	/// particularly in the creation of a window manager.
-	///
-	/// For example:
+	/// This is useful for relaying values from the request when sending a new request, for
+	/// example:
 	/// ```
 	/// xcb::Event::X(x::Event::ConfigureRequestEvent(req)) => {
 	///     conn.send_request(&x::ConfigureWindow {
 	///         window: req.window(),
 	///         value_list: &req.values(),
 	///     });
-	/// 
+	///
 	///     conn.flush()?;
 	/// }
 	/// ```
@@ -63,18 +62,11 @@ impl ConfigureRequestEventExtensions for ConfigureRequestEvent {
 			ConfigWindow::StackMode(self.stack_mode()),
 		];
 
-		// We filter the fields by checking their masks with [`Self::check_mask`], then convert the
-		// fields from [`ConfigWindowField`] enums into [`ConfigWindow`] enums (hence the explit
-		// type annotation of `<ConfigWindow, _>` on [`Iterator::filter_map`]).
-		//
-		// If that's a little confusing, it's basically iterator magic for filtering out the fields
-		// that aren't present in the `value_mask` and converting the remaining fields to
-		// [`ConfigWindow`] enums.
+		// Filter the list of fields to only contain those which are present in the `value_mask`,
+		// then return it.
 		fields
 			.into_iter()
-			.filter_map(|field| {
-				self.value_mask().contains(field.mask()).then(|| field)
-			})
+			.filter(|field| self.value_mask().contains(field.mask()))
 			.collect()
 	}
 }
