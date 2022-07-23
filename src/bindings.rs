@@ -1,124 +1,160 @@
-use xcb::x::{self, ConfigWindow, ConfigWindowMask, Window};
+use xcb::x::{self, ConfigWindow, ConfigWindowMask, StackMode, Window};
 
-/// Wraps an [xcb] event to simplify or ease its use.
-pub trait WrapEvent<T>
-where
-	T: xcb::BaseEvent,
-{
-	/// Creates the wrapped event from its [xcb] counterpart.
-	fn wrap(xcb_event: T) -> Self;
+/// Allows wrapping an object of type `T` to instantiate [`Self`] and unwrapping to get it back.
+///
+/// The intention of this trait is to wrap objects to provide extra utilities around that object.
+pub trait Wrapping<T> {
+	/// Constructs itself by wrapping an object of its [`Wrapping`] type `T`.
+	fn wrap(contents: T) -> Self;
 
-	/// Gets a reference to the wrapped [xcb] event.
-	fn as_xcb_event(&self) -> &T;
+	/// Returns the wrapped object.
+	fn unwrap(self) -> T;
+}
+
+/// Wraps values for [ConfigWindowReqEvent]s. Equivalent to [ConfigWindow].
+///
+/// The purpose of this enum is to allow easy access to a particular field's associated
+/// [ConfigWindowMask]. It can be converted [`into()`](Into::into) a [ConfigWindow] enum, and a
+/// [ConfigWindow] enum can, in turn, be converted [`into()`](Into::into) a [ConfigWindowField].
+pub enum ConfigWindowField {
+	X(i16),
+	Y(i16),
+	Width(u16),
+	Height(u16),
+	BorderWidth(u16),
+	Sibling(Window),
+	StackMode(StackMode),
+}
+
+impl ConfigWindowField {
+	/// Get the corresponding [ConfigWindowMask] for a [ConfigWindowField].
+	///
+	/// The mask can be easily checked in a [ConfigWindowReqEvent] with
+	/// [ConfigWindowReqEvent::check_mask].
+	pub fn mask(&self) -> ConfigWindowMask {
+		match self {
+			Self::X(_) => ConfigWindowMask::X,
+			Self::Y(_) => ConfigWindowMask::Y,
+			Self::Width(_) => ConfigWindowMask::WIDTH,
+			Self::Height(_) => ConfigWindowMask::HEIGHT,
+			Self::BorderWidth(_) => ConfigWindowMask::BORDER_WIDTH,
+			Self::Sibling(_) => ConfigWindowMask::SIBLING,
+			Self::StackMode(_) => ConfigWindowMask::STACK_MODE,
+		}
+	}
+}
+
+// Convert from [ConfigWindow] to [ConfigWindowField].
+impl From<ConfigWindow> for ConfigWindowField {
+	fn from(config_window: ConfigWindow) -> Self {
+		match config_window {
+			ConfigWindow::X(x) => Self::X(x as i16),
+			ConfigWindow::Y(y) => Self::Y(y as i16),
+			ConfigWindow::Width(width) => Self::Width(width as u16),
+			ConfigWindow::Height(height) => Self::Height(height as u16),
+			ConfigWindow::BorderWidth(border_width) => Self::BorderWidth(border_width as u16),
+			ConfigWindow::Sibling(sibling) => Self::Sibling(sibling),
+			ConfigWindow::StackMode(stack_mode) => Self::StackMode(stack_mode),
+		}
+	}
+}
+
+// Convert from [ConfigWindowField] to [ConfigWindow].
+impl From<ConfigWindowField> for ConfigWindow {
+	fn from(config_window_field: ConfigWindowField) -> ConfigWindow {
+		match config_window_field {
+			ConfigWindowField::X(x) => ConfigWindow::X(x.into()),
+			ConfigWindowField::Y(y) => ConfigWindow::Y(y.into()),
+			ConfigWindowField::Width(width) => ConfigWindow::Width(width.into()),
+			ConfigWindowField::Height(height) => ConfigWindow::Height(height.into()),
+			ConfigWindowField::BorderWidth(border_width) => ConfigWindow::BorderWidth(border_width.into()),
+			ConfigWindowField::Sibling(sibling) => ConfigWindow::Sibling(sibling),
+			ConfigWindowField::StackMode(stack_mode) => ConfigWindow::StackMode(stack_mode),
+		}
+	}
 }
 
 /// A wrapper around [xcb::x::ConfigureRequestEvent]s that checks for missing fields.
 ///
-/// This wrapper returns [Option]s for values that may be missing, and provides a
-/// [values](WrappedConfigureRequestEvent::values) function to simplify sending a
+/// This wrapper returns [`Option`](core::option)s for values that may be missing, and provides a
+/// [`value_list()`](WrappedConfigureRequestEvent::value_list) method to simplify sending a
 /// [ConfigureWindow](xcb::x::ConfigureWindow) request with matching parameters.
 ///
 /// An existing [ConfigureRequestEvent](xcb::x::ConfigureRequestEvent) can be wrapped like so:
 /// ```
 /// xcb::Event::X(x::Event::ConfigureRequest(req)) => {
-///     let req = WrappedConfigureRequestEvent::wrap(req);
+///     let req = ConfigWindowReqEvent::wrap(req);
 /// }
 /// ```
-pub struct WrappedConfigureRequestEvent {
+pub struct ConfigWindowReqEvent {
 	xcb_event: x::ConfigureRequestEvent,
 }
 
-impl WrapEvent<x::ConfigureRequestEvent> for WrappedConfigureRequestEvent {
+impl Wrapping<x::ConfigureRequestEvent> for ConfigWindowReqEvent {
 	fn wrap(xcb_event: x::ConfigureRequestEvent) -> Self {
 		Self { xcb_event }
 	}
 
-	fn as_xcb_event(&self) -> &x::ConfigureRequestEvent {
-		&self.xcb_event
+	fn unwrap(self) -> x::ConfigureRequestEvent {
+		self.xcb_event
 	}
 }
 
-impl WrappedConfigureRequestEvent {
-	/// Gets the [StackMode](xcb::x::StackMode) of the window, if provided in the request.
+impl ConfigWindowReqEvent {
+	/// Gets the [StackMode](x::StackMode) from the request, or [None] if not provided.
 	pub fn stack_mode(&self) -> Option<x::StackMode> {
-		self.present(
-			self.as_xcb_event().stack_mode(),
-			ConfigWindowMask::STACK_MODE,
-		)
+		self.wrap_value(self.xcb_event.stack_mode(), ConfigWindowMask::STACK_MODE)
 	}
 
-	/// Gets the parent of the window that the request is for.
+	/// Gets the parent [Window] from the request, or [None] if not provided.
 	pub fn parent(&self) -> Window {
-		self.as_xcb_event().parent()
+		self.xcb_event.parent()
 	}
 
-	/// Gets the window that the request asks to be configured.
+	/// Gets the [Window] from the request, or [None] if not provided.
 	pub fn window(&self) -> Window {
-		self.as_xcb_event().window()
+		self.xcb_event.window()
 	}
 
-	/// Gets the window's sibling, if provided in the request.
+	/// Gets the sibling [Window] from the request, or [None] if not provided.
 	pub fn sibling(&self) -> Option<Window> {
-		self.present(self.as_xcb_event().sibling(), ConfigWindowMask::SIBLING)
+		self.wrap_value(self.xcb_event.sibling(), ConfigWindowMask::SIBLING)
 	}
 
-	/// Gets the x-coordinate of the window, if provided in the request.
-	///
-	/// Though the underlying [ConfigRequestEvent](xcb::x::ConfigureRequestEvent) contains an [i16],
-	/// the x-coordinate value is converted to an [i32] so that it can be easily provided in a
-	/// [ConfigureWindow](xcb::x::ConfigureWindow) request.
+	/// Gets the x-coordinate from the request, or [None] if not provided.
 	pub fn x(&self) -> Option<i32> {
-		self.present(self.as_xcb_event().x() as i32, ConfigWindowMask::X)
+		self.wrap_value(self.xcb_event.x() as i32, ConfigWindowMask::X)
 	}
 
-	/// Gets the y-coordinate of the window, if provided in the request.
-	///
-	/// Though the underlying [ConfigRequestEvent](xcb::x::ConfigureRequestEvent) contains an [i16],
-	/// the y-coordinate value is converted to an [i32] so that it can be easily provided in a
-	/// [ConfigureWindow](xcb::x::ConfigureWindow) request.
+	/// Gets the y-coordinate from the request, or [None] if not provided.
 	pub fn y(&self) -> Option<i32> {
-		self.present(self.as_xcb_event().y() as i32, ConfigWindowMask::Y)
+		self.wrap_value(self.xcb_event.y() as i32, ConfigWindowMask::Y)
 	}
 
-	/// Gets the width of the window, if provided in the request.
-	///
-	/// Though the underlying [ConfigRequestEvent](xcb::x::ConfigureRequestEvent) contains an [i16],
-	/// the width is converted to an [i32] so that it can be easily provided in a
-	/// [ConfigureWindow](xcb::x::ConfigureWindow) request.
+	/// Gets the width from the request, or [None] if not provided.
 	pub fn width(&self) -> Option<u32> {
-		self.present(self.as_xcb_event().width() as u32, ConfigWindowMask::WIDTH)
+		self.wrap_value(self.xcb_event.width() as u32, ConfigWindowMask::WIDTH)
 	}
 
-	/// Gets the height of the window, if provided in the request.
-	///
-	/// Though the underlying [ConfigRequestEvent](xcb::x::ConfigureRequestEvent) contains an [i16],
-	/// the height is converted to an [i32] so that it can be easily provided in a
-	/// [ConfigureWindow](xcb::x::ConfigureWindow) request.
+	/// Gets the height from the request, or [None] if not provided.
 	pub fn height(&self) -> Option<u32> {
-		self.present(
-			self.as_xcb_event().height() as u32,
-			ConfigWindowMask::HEIGHT,
-		)
+		self.wrap_value(self.xcb_event.height() as u32, ConfigWindowMask::HEIGHT)
 	}
 
-	/// Gets the border width of the window, if provided in the request.
-	///
-	/// Though the underlying [ConfigRequestEvent](xcb::x::ConfigureRequestEvent) contains an [i16],
-	/// the border width is converted to an [i32] so that it can be easily provided in a
-	/// [ConfigureWindow](xcb::x::ConfigureWindow) request.
+	/// Gets the border width from the request, or [None] if not provided.
 	pub fn border_width(&self) -> Option<u32> {
-		self.present(
-			self.as_xcb_event().border_width() as u32,
+		self.wrap_value(
+			self.xcb_event.border_width() as u32,
 			ConfigWindowMask::BORDER_WIDTH,
 		)
 	}
 
-	/// Puts all of the values that were present in the request into a list.
+	/// Gets all the values provided in the request.
 	///
 	/// This makes it easier to send in a [ConfigureWindow](xcb::x::ConfigureWindow) request:
 	/// ```
 	/// xcb::Event::X(x::Event::ConfigureRequest(req)) => {
-	///     let req = WrappedConfigureRequestEvent::wrap(req);
+	///     let req = ConfigWindowReqEvent::wrap(req);
 	///
 	///     conn.send_request(&x::ConfigureWindow {
 	///         window: req.window(),
@@ -130,55 +166,40 @@ impl WrappedConfigureRequestEvent {
 	/// ```
 	pub fn values(&self) -> Vec<ConfigWindow> {
 		let fields = [
-			(
-				ConfigWindow::X(self.as_xcb_event().x().into()),
-				ConfigWindowMask::X,
-			),
-			(
-				ConfigWindow::Y(self.as_xcb_event().y().into()),
-				ConfigWindowMask::Y,
-			),
-			(
-				ConfigWindow::Width(self.as_xcb_event().width().into()),
-				ConfigWindowMask::WIDTH,
-			),
-			(
-				ConfigWindow::Height(self.as_xcb_event().height().into()),
-				ConfigWindowMask::HEIGHT,
-			),
-			(
-				ConfigWindow::BorderWidth(self.as_xcb_event().border_width().into()),
-				ConfigWindowMask::BORDER_WIDTH,
-			),
-			(
-				ConfigWindow::Sibling(self.as_xcb_event().sibling()),
-				ConfigWindowMask::SIBLING,
-			),
-			(
-				ConfigWindow::StackMode(self.as_xcb_event().stack_mode()),
-				ConfigWindowMask::STACK_MODE,
-			),
+			ConfigWindowField::X(self.xcb_event.x()),
+			ConfigWindowField::Y(self.xcb_event.y()),
+			ConfigWindowField::Width(self.xcb_event.width()),
+			ConfigWindowField::Height(self.xcb_event.height()),
+			ConfigWindowField::BorderWidth(self.xcb_event.border_width()),
+			ConfigWindowField::Sibling(self.xcb_event.sibling()),
+			ConfigWindowField::StackMode(self.xcb_event.stack_mode()),
 		];
 
-		let values: Vec<ConfigWindow> = fields
+		// We filter the fields by checking their masks with [`Self::check_mask`], then convert the
+		// fields from [`ConfigWindowField`] enums into [`ConfigWindow`] enums (hence the explit
+		// type annotation of `<ConfigWindow, _>` on [`Iterator::filter_map`]).
+		//
+		// If that's a little confusing, it's basically iterator magic for filtering out the fields
+		// that aren't present in the `value_mask` and converting them to [`ConfigWindow`] enums.
+		fields
 			.into_iter()
-			.filter_map(|(value, mask)| {
-				self.as_xcb_event()
-					.value_mask()
-					.contains(mask)
-					.then(|| value)
+			.filter_map::<ConfigWindow, _>(|field| {
+				self.check_mask(field.mask()).then(|| field.into())
 			})
-			.collect();
-
-		values
+			.collect()
 	}
 
-	/// Wraps the field with an [Option] based on its presence in the `value_mask`.
-	fn present<T>(&self, field: T, mask: ConfigWindowMask) -> Option<T> {
-		if self.as_xcb_event().value_mask().contains(mask) {
+	/// Wraps the field value with an [Option] based on its presence in the `value_mask`.
+	fn wrap_value<T>(&self, field: T, mask: ConfigWindowMask) -> Option<T> {
+		if self.xcb_event.value_mask().contains(mask) {
 			return Some(field);
 		}
 
 		None
+	}
+
+	/// Checks the value mask to see if the given [`mask`] is present.
+	pub fn check_mask(&self, mask: ConfigWindowMask) -> bool {
+		self.xcb_event.value_mask().contains(mask)
 	}
 }
