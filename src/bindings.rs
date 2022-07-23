@@ -184,7 +184,8 @@ impl ConfigWindowReqEvent {
 		// type annotation of `<ConfigWindow, _>` on [`Iterator::filter_map`]).
 		//
 		// If that's a little confusing, it's basically iterator magic for filtering out the fields
-		// that aren't present in the `value_mask` and converting them to [`ConfigWindow`] enums.
+		// that aren't present in the `value_mask` and converting the remaining fields to
+		// [`ConfigWindow`] enums.
 		fields
 			.into_iter()
 			.filter_map::<ConfigWindow, _>(|field| {
@@ -202,7 +203,7 @@ impl ConfigWindowReqEvent {
 		None
 	}
 
-	/// Checks the value mask to see if the given [`mask`] is present.
+	/// Checks the value mask to see if the given `mask` is present.
 	pub fn check_mask(&self, mask: ConfigWindowMask) -> bool {
 		self.xcb_event.value_mask().contains(mask)
 	}
