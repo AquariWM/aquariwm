@@ -2,10 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use xcb::x::{self, ConfigWindow, ConfigWindowMask};
+use xcb::x;
 use xcb::Connection;
 
 use crate::setup;
+use crate::bindings::{WrapEvent, WrappedConfigureRequestEvent};
 
 /// Grants all client requests to configure their windows.
 ///
@@ -13,47 +14,12 @@ use crate::setup;
 /// [ConfigureWindow](xcb::x::ConfigureWindow) requests, as any such modifications can be made by
 /// AquariWM once the window is mapped.
 pub fn on_configure(conn: &Connection, req: x::ConfigureRequestEvent) -> xcb::Result<()> {
-	// We create an array of the values from the request and their corresponding masks to make it
-	// easy to filter out the values that aren't actually contained in the request. Sending values
-	// that don't actually exist obviously breaks a lot of things.
-	let fields = [
-		(ConfigWindow::X(req.x().into()), ConfigWindowMask::X),
-		(ConfigWindow::Y(req.y().into()), ConfigWindowMask::Y),
-		(
-			ConfigWindow::Width(req.width().into()),
-			ConfigWindowMask::WIDTH,
-		),
-		(
-			ConfigWindow::Height(req.height().into()),
-			ConfigWindowMask::HEIGHT,
-		),
-		(
-			ConfigWindow::BorderWidth(req.border_width().into()),
-			ConfigWindowMask::BORDER_WIDTH,
-		),
-		(
-			ConfigWindow::Sibling(req.sibling()),
-			ConfigWindowMask::SIBLING,
-		),
-		(
-			ConfigWindow::StackMode(req.stack_mode()),
-			ConfigWindowMask::STACK_MODE,
-		),
-	];
-
-	// The `value_mask` sent with the request is a bitmask that tells us which fields were sent in
-	// the request, and which fields were not. To get the correct values, we filter the fields by
-	// which fields are indicated in the `value_mask`, then map the fields to just their individual
-	// values. We can then collect the iterator into a list that we can easily send to the X
-	// server.
-	let values: Vec<ConfigWindow> = fields
-		.into_iter()
-		.filter_map(|(value, mask)| req.value_mask().contains(mask).then(|| value))
-		.collect();
+	// Wrap the request to easily get its values.
+	let req = WrappedConfigureRequestEvent::wrap(req);
 
 	conn.send_request(&x::ConfigureWindow {
 		window: req.window(),
-		value_list: &values,
+		value_list: &req.values(),
 	});
 
 	conn.flush()?;

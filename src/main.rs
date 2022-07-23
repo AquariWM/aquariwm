@@ -6,6 +6,7 @@
 // ICCCM    https://tronche.com/gui/x/icccm/
 // EWMH     https://specifications.freedesktop.org/wm-spec/latest/
 
+pub mod bindings;
 pub mod handlers;
 pub mod setup;
 
