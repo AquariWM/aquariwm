@@ -67,7 +67,9 @@ impl From<ConfigWindowField> for ConfigWindow {
 			ConfigWindowField::Y(y) => ConfigWindow::Y(y.into()),
 			ConfigWindowField::Width(width) => ConfigWindow::Width(width.into()),
 			ConfigWindowField::Height(height) => ConfigWindow::Height(height.into()),
-			ConfigWindowField::BorderWidth(border_width) => ConfigWindow::BorderWidth(border_width.into()),
+			ConfigWindowField::BorderWidth(border_width) => {
+				ConfigWindow::BorderWidth(border_width.into())
+			}
 			ConfigWindowField::Sibling(sibling) => ConfigWindow::Sibling(sibling),
 			ConfigWindowField::StackMode(stack_mode) => ConfigWindow::StackMode(stack_mode),
 		}
@@ -77,7 +79,7 @@ impl From<ConfigWindowField> for ConfigWindow {
 /// A wrapper around [xcb::x::ConfigureRequestEvent]s that checks for missing fields.
 ///
 /// This wrapper returns [`Option`](core::option)s for values that may be missing, and provides a
-/// [`value_list()`](WrappedConfigureRequestEvent::value_list) method to simplify sending a
+/// [`values()`](WrappedConfigureRequestEvent::values) method to simplify sending a
 /// [ConfigureWindow](xcb::x::ConfigureWindow) request with matching parameters.
 ///
 /// An existing [ConfigureRequestEvent](xcb::x::ConfigureRequestEvent) can be wrapped like so:
