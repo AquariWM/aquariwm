@@ -10,7 +10,7 @@
 ///
 /// Items in this module simply wrap existing items within [xcb], providing utilities that
 /// streamline communication with the X server.
-pub mod wrappers;
+pub mod extensions;
 
 /// Handles events from the event loop.
 ///
