@@ -5,8 +5,8 @@
 use xcb::x;
 use xcb::Connection;
 
-use crate::bindings::{ConfigWindowReqEvent, Wrapping};
 use crate::setup;
+use crate::wrappers::{ConfigWindowReqEvent, Wrapping};
 
 /// Grants all client requests to configure their windows.
 ///

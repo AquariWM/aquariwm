@@ -6,9 +6,20 @@
 // ICCCM    https://tronche.com/gui/x/icccm/
 // EWMH     https://specifications.freedesktop.org/wm-spec/latest/
 
-pub mod bindings;
-pub mod handlers;
-pub mod setup;
+/// Provides various helpful wrappers that make interacting with [xcb] easier.
+///
+/// Items in this module simply wrap existing items within [xcb], providing utilities that
+/// streamline communication with the X server.
+pub mod wrappers;
+
+/// Handles events from the event loop.
+///
+/// This module contains functions to handle certain events from the event loop. It helps to split
+/// the handling for different events into different functions for the sake of readability.
+mod handlers;
+
+/// Provides functions for the setup/initialization of both the window manager and new windows.
+mod setup;
 
 use xcb::x;
 
