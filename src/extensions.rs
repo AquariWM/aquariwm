@@ -8,7 +8,11 @@ pub trait ConfigWindowExtensions {
 	/// ```
 	/// let x = x::ConfigWindow::X(req.x());
 	/// 
-	/// req.value_mask().contains(x.mask());
+	/// if req.value_mask().contains(x.mask()) {
+	///     return Some(x);
+	/// }
+	/// 
+	/// None
 	/// ```
 	fn mask(&self) -> ConfigWindowMask;
 }
