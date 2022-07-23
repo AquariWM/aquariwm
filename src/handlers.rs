@@ -14,7 +14,6 @@ use crate::extensions::ConfigureRequestEventExtensions;
 /// [ConfigureWindow](xcb::x::ConfigureWindow) requests, as any such modifications can be made by
 /// AquariWM once the window is mapped.
 pub fn on_configure(conn: &Connection, req: x::ConfigureRequestEvent) -> xcb::Result<()> {
-	// Wrap the request to easily get its values.
 	conn.send_request(&x::ConfigureWindow {
 		window: req.window(),
 		value_list: &req.values(),
