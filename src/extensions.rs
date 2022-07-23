@@ -33,7 +33,7 @@ impl ConfigWindowExtensions for ConfigWindow {
 
 /// Extends [ConfigureRequestEvent] for easy access to a list of the request's values.
 pub trait ConfigureRequestEventExtensions {
-	/// Creates a list of the values contained in the request that are present in the value mask.
+	/// Creates a list of the values contained in the request that are present in the `value_mask`.
 	///
 	/// This is useful for relaying values from the request when sending a new request, for
 	/// example:
