@@ -6,10 +6,7 @@
 // ICCCM    https://tronche.com/gui/x/icccm/
 // EWMH     https://specifications.freedesktop.org/wm-spec/latest/
 
-/// Provides various helpful wrappers that make interacting with [xcb] easier.
-///
-/// Items in this module simply wrap existing items within [xcb], providing utilities that
-/// streamline communication with the X server.
+/// Useful trait extensions for [xcb] to provide easier access to certain utilities.
 pub mod extensions;
 
 /// Handles events from the event loop.
