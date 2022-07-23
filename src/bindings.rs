@@ -81,7 +81,7 @@ impl From<ConfigWindowField> for ConfigWindow {
 /// A wrapper around [xcb::x::ConfigureRequestEvent]s that checks for missing fields.
 ///
 /// This wrapper returns [`Option`](core::option)s for values that may be missing, and provides a
-/// [`values()`](WrappedConfigureRequestEvent::values) method to simplify sending a
+/// [`values()`](ConfigWindowReqEvent::values) method to simplify sending a
 /// [ConfigureWindow](xcb::x::ConfigureWindow) request with matching parameters.
 ///
 /// An existing [ConfigureRequestEvent](xcb::x::ConfigureRequestEvent) can be wrapped like so:
