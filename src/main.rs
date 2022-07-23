@@ -6,8 +6,8 @@
 // ICCCM    https://tronche.com/gui/x/icccm/
 // EWMH     https://specifications.freedesktop.org/wm-spec/latest/
 
-/// Useful trait extensions for [xcb] to provide easier access to certain utilities.
 pub mod utility;
+pub mod functions;
 
 /// Handles events from the event loop.
 ///
@@ -19,6 +19,13 @@ mod handlers;
 mod setup;
 
 use xcb::x;
+use functions::manipulation::ManipulationState;
+
+/// Keeps track of the current state of the window manager.
+#[derive(Default)]
+pub struct WmState {
+	pub mode: ManipulationState,
+}
 
 /// A primitive base window manager implementation for AquariWM to build upon.
 ///
@@ -27,6 +34,8 @@ use xcb::x;
 /// functions of moving windows, resizing windows, focusing a particular window, and toggling
 /// fullscreen for the focused window.
 pub fn main() -> xcb::Result<()> {
+	let _wm_state = WmState::default();
+
 	// Connect to the X server.
 	let (conn, screen_num) = xcb::Connection::connect(None)?;
 
