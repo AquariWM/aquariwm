@@ -7,7 +7,7 @@
 // EWMH     https://specifications.freedesktop.org/wm-spec/latest/
 
 /// Useful trait extensions for [xcb] to provide easier access to certain utilities.
-pub mod extensions;
+pub mod utility;
 
 /// Handles events from the event loop.
 ///
