@@ -6,7 +6,7 @@ use xcb::x;
 use xcb::Connection;
 
 use crate::setup;
-use crate::wrappers::{ConfigWindowReqEvent, Wrapping};
+use crate::extensions::ConfigureRequestEventExtensions;
 
 /// Grants all client requests to configure their windows.
 ///
@@ -15,8 +15,6 @@ use crate::wrappers::{ConfigWindowReqEvent, Wrapping};
 /// AquariWM once the window is mapped.
 pub fn on_configure(conn: &Connection, req: x::ConfigureRequestEvent) -> xcb::Result<()> {
 	// Wrap the request to easily get its values.
-	let req = ConfigWindowReqEvent::wrap(req);
-
 	conn.send_request(&x::ConfigureWindow {
 		window: req.window(),
 		value_list: &req.values(),
