@@ -21,11 +21,11 @@ pub trait Wrapping<T> {
 /// [ConfigWindowMask]. It can be converted [`into()`](Into::into) a [ConfigWindow] enum, and a
 /// [ConfigWindow] enum can, in turn, be converted [`into()`](Into::into) a [ConfigWindowField].
 pub enum ConfigWindowField {
-	X(i16),
-	Y(i16),
-	Width(u16),
-	Height(u16),
-	BorderWidth(u16),
+	X(i32),
+	Y(i32),
+	Width(u32),
+	Height(u32),
+	BorderWidth(u32),
 	Sibling(Window),
 	StackMode(StackMode),
 }
@@ -52,11 +52,11 @@ impl ConfigWindowField {
 impl From<ConfigWindow> for ConfigWindowField {
 	fn from(config_window: ConfigWindow) -> Self {
 		match config_window {
-			ConfigWindow::X(x) => Self::X(x as i16),
-			ConfigWindow::Y(y) => Self::Y(y as i16),
-			ConfigWindow::Width(width) => Self::Width(width as u16),
-			ConfigWindow::Height(height) => Self::Height(height as u16),
-			ConfigWindow::BorderWidth(border_width) => Self::BorderWidth(border_width as u16),
+			ConfigWindow::X(x) => Self::X(x),
+			ConfigWindow::Y(y) => Self::Y(y),
+			ConfigWindow::Width(width) => Self::Width(width),
+			ConfigWindow::Height(height) => Self::Height(height),
+			ConfigWindow::BorderWidth(border_width) => Self::BorderWidth(border_width),
 			ConfigWindow::Sibling(sibling) => Self::Sibling(sibling),
 			ConfigWindow::StackMode(stack_mode) => Self::StackMode(stack_mode),
 		}
@@ -67,13 +67,11 @@ impl From<ConfigWindow> for ConfigWindowField {
 impl From<ConfigWindowField> for ConfigWindow {
 	fn from(config_window_field: ConfigWindowField) -> ConfigWindow {
 		match config_window_field {
-			ConfigWindowField::X(x) => ConfigWindow::X(x.into()),
-			ConfigWindowField::Y(y) => ConfigWindow::Y(y.into()),
-			ConfigWindowField::Width(width) => ConfigWindow::Width(width.into()),
-			ConfigWindowField::Height(height) => ConfigWindow::Height(height.into()),
-			ConfigWindowField::BorderWidth(border_width) => {
-				ConfigWindow::BorderWidth(border_width.into())
-			}
+			ConfigWindowField::X(x) => ConfigWindow::X(x),
+			ConfigWindowField::Y(y) => ConfigWindow::Y(y),
+			ConfigWindowField::Width(width) => ConfigWindow::Width(width),
+			ConfigWindowField::Height(height) => ConfigWindow::Height(height),
+			ConfigWindowField::BorderWidth(border_width) => ConfigWindow::BorderWidth(border_width),
 			ConfigWindowField::Sibling(sibling) => ConfigWindow::Sibling(sibling),
 			ConfigWindowField::StackMode(stack_mode) => ConfigWindow::StackMode(stack_mode),
 		}
@@ -172,11 +170,11 @@ impl ConfigWindowReqEvent {
 	/// ```
 	pub fn values(&self) -> Vec<ConfigWindow> {
 		let fields = [
-			ConfigWindowField::X(self.xcb_event.x()),
-			ConfigWindowField::Y(self.xcb_event.y()),
-			ConfigWindowField::Width(self.xcb_event.width()),
-			ConfigWindowField::Height(self.xcb_event.height()),
-			ConfigWindowField::BorderWidth(self.xcb_event.border_width()),
+			ConfigWindowField::X(self.xcb_event.x().into()),
+			ConfigWindowField::Y(self.xcb_event.y().into()),
+			ConfigWindowField::Width(self.xcb_event.width().into()),
+			ConfigWindowField::Height(self.xcb_event.height().into()),
+			ConfigWindowField::BorderWidth(self.xcb_event.border_width().into()),
 			ConfigWindowField::Sibling(self.xcb_event.sibling()),
 			ConfigWindowField::StackMode(self.xcb_event.stack_mode()),
 		];
