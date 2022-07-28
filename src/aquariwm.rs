@@ -7,6 +7,8 @@ use tracing::{info, trace};
 use xcb::x::{self, Window};
 use xcb::{Connection, Xid};
 
+use crate::extensions::*;
+
 /// The central object of the entire AquariWM window manager. Contains state and the event loop.
 pub struct AquariWm {
 	conn: Connection,
@@ -18,43 +20,75 @@ impl AquariWm {
 		Self { conn, _root: root }
 	}
 
-	/// Runs the event loop - the very core of the window manager which receives events.
+	/// Starts AquariWM's event loop to listen and respond to new events.
 	pub fn run(&self) -> xcb::Result<()> {
 		info!("Running the window manager");
+		let conn = &self.conn;
+
 		loop {
 			match self.conn.wait_for_event()? {
+				// Accept client requests to configure their windows in full.
 				xcb::Event::X(x::Event::ConfigureRequest(req)) => {
-					trace!(
-						"Processing request to configure window ({})",
-						req.window().resource_id()
-					);
+					trace!("Configuring window ({})", req.window().resource_id());
+					conn.send_request(&x::ConfigureWindow {
+						window: req.window(),
+						value_list: &req.values(),
+					});
+
+					conn.flush()?;
 				}
+				// Allow clients to map their windows, but initialise those windows with AquariWM
+				// afterwards.
 				xcb::Event::X(x::Event::MapRequest(req)) => {
-					trace!(
-						"Processing request to map window ({})",
-						req.window().resource_id()
-					);
+					let window = req.window();
+					trace!("Mapping window ({})", window.resource_id());
+
+					conn.send_request(&x::MapWindow { window });
+					// TODO: Is it guaranteed that the `MapWindow` request will be processed
+					//       before the window initialization requests are? Might need to wait
+					//       until the window is mapped first...
+					crate::init_window(conn, &window)?;
+
+					conn.flush()?;
 				}
+				// TODO: Unimplemented. For window manipulation.
 				xcb::Event::X(x::Event::ButtonPress(notif)) => {
 					trace!("Processing button press ({})", notif.detail());
 				}
+				// TODO: Unimplemented. For window manipulation.
 				xcb::Event::X(x::Event::ButtonRelease(notif)) => {
 					trace!("Processing button release ({})", notif.detail());
 				}
+				// TODO: Unimplemented. For window manipulation.
 				xcb::Event::X(x::Event::MotionNotify(_)) => {
 					trace!("Processing cursor drag");
 				}
+				// Focus whatever window the cursor enters.
 				xcb::Event::X(x::Event::EnterNotify(notif)) => {
 					trace!(
-						"Processing cursor-entered-window event ({})",
+						"Focusing window entered by cursor ({})",
 						notif.event().resource_id()
 					);
+					conn.send_request(&x::SetInputFocus {
+						revert_to: x::InputFocus::Parent,
+						focus: notif.event(),
+						time: x::CURRENT_TIME,
+					});
+
+					conn.flush()?;
 				}
+				// Bring windows to the top of the stack as they are focused.
 				xcb::Event::X(x::Event::FocusIn(notif)) => {
 					trace!(
-						"Processing newly focused window ({})",
+						"Bringing the newly focused window to the top of the stack ({})",
 						notif.event().resource_id()
 					);
+					conn.send_request(&x::ConfigureWindow {
+						window: notif.event(),
+						value_list: &[x::ConfigWindow::StackMode(x::StackMode::Above)],
+					});
+
+					conn.flush()?;
 				}
 				_ => {}
 			}
