@@ -7,7 +7,7 @@ use tracing::{info, trace};
 use xcb::x::{self, Window};
 use xcb::{Connection, Xid};
 
-use crate::extensions::*;
+use crate::extensions::ConfigureRequestEventExtensions;
 
 /// The central object of the entire AquariWM window manager. Contains state and the event loop.
 pub struct AquariWm {
