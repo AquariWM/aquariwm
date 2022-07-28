@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use tracing::{info, trace};
+use tracing::{info, debug, trace};
 
 use xcb::x::{self, Window};
 use xcb::{Connection, Xid};
@@ -48,11 +48,13 @@ impl AquariWm {
 					trace!("Mapping window ({})", window.resource_id());
 
 					conn.send_request(&x::MapWindow { window });
-					// TODO: Is it guaranteed that the `MapWindow` request will be processed
-					//       before the window initialization requests are? Might need to wait
-					//       until the window is mapped first...
-					crate::init_window(conn, &window)?;
+                    // TODO: Check if this is necessary. Maybe events can be registered fine
+                    //       before a window is mapped, and that it is only that they are cleared
+                    //       when it is unmapped?
+                    conn.flush()?;
 
+                    debug!("Setting up newly mapped window ({})", window.resource_id());
+					crate::init_window(conn, &window)?;
 					conn.flush()?;
 				}
 				// TODO: Unimplemented. For window manipulation.
