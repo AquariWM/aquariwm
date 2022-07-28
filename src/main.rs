@@ -126,7 +126,7 @@ fn main() -> xcb::Result<()> {
 		.zip(windows)
 		.for_each(|(reply, window)| {
 			if reply.is_ok() && reply.unwrap().map_state() == x::MapState::Viewable {
-				init_window(&conn, window).expect("Failed to initalize window");
+				init_window(&conn, window).expect("Failed to initialize window");
 			}
 		});
 
@@ -134,13 +134,15 @@ fn main() -> xcb::Result<()> {
 	// flush the connection to send all of those queued requests at once.
 	conn.flush()?;
 
-	info!("Initialization complete, running the window manager");
+	info!("Initialization complete");
 
 	// It is now time to finalize the initialization of AquariWM by instantiating the main window
 	// manager.
-	let mut _wm = AquariWm::new(conn, root);
-
-	Ok(())
+	let wm = AquariWm::new(conn, root);
+	// TODO: Explore possible options for making this cleaner/more idiomatic. Ideally,
+	//       instantiating the window manager and running the event loop would be the same
+	//       function call.
+	wm.run()
 }
 
 /// Initializes the given [window](x::Window) by requesting to receive certain events on it.
