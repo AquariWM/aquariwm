@@ -6,7 +6,6 @@ use xcb::x;
 use xcb::Connection;
 
 use crate::utility::extensions::ConfigureRequestEventExtensions;
-use crate::setup;
 
 /// Grants all client requests to configure their windows.
 ///
@@ -51,7 +50,6 @@ pub fn on_map(conn: &Connection, req: x::MapRequestEvent) -> xcb::Result<()> {
 
 	// Register for events useful to the window manager on the newly mapped window. See
 	// documentation on [setup::register_for_events] for more information.
-	setup::register_for_events(conn, req.window())?;
 
 	conn.flush()?;
 	Ok(())
