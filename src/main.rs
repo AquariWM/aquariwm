@@ -2,6 +2,18 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+//! AquariWM is an extensible, modular window manager for X11.
+//!
+//! Through its modular approach, AquariWM hopes to allow for in-depth customization and
+//! configuration of the window manager and to make this accessible to as many people as possible.
+//! 
+//! This modularity is achieved through a system of _components_. Each component is a separate
+//! program, an isolated group of functionality that is responsible for a specific part of the
+//! window manager. For example, a configuration component might be the program responsible for
+//! configuring AquariWM to the user's preference. Doing this as a component allows the user to
+//! choose whichever configuration method they prefer, meaning you can use what works best for
+//! you.
+
 /// The central module of AquariWM. Responsible for overseeing AquariWM's state and operation.
 ///
 /// The `aquariwm` module can be thought of as the brain behind AquariWM. It keeps track of the
@@ -9,7 +21,7 @@
 /// components.
 mod aquariwm;
 
-use tracing::{debug, info, trace};
+use tracing::{info, debug, trace};
 
 use xcb::x::{self, Window};
 use xcb::{Connection, Xid};
@@ -126,7 +138,7 @@ fn main() -> xcb::Result<()> {
 		.zip(windows)
 		.for_each(|(reply, window)| {
 			if reply.is_ok() && reply.unwrap().map_state() == x::MapState::Viewable {
-				init_window(&conn, window).expect("Failed to initialize window");
+				init_window(&conn, window).ok();
 			}
 		});
 
