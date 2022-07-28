@@ -22,7 +22,7 @@
 mod aquariwm;
 
 /// This module provides an assortment of utility traits to ease interaction with [xcb].
-mod extensions;
+pub mod extensions;
 
 use tracing::{debug, info, trace};
 
