@@ -21,6 +21,9 @@
 /// components.
 mod aquariwm;
 
+/// This module provides an assortment of utility traits to ease interaction with [xcb].
+mod extensions;
+
 use tracing::{info, debug, trace};
 
 use xcb::x::{self, Window};
