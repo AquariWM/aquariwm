@@ -6,7 +6,7 @@
 //!
 //! Through its modular approach, AquariWM hopes to allow for in-depth customization and
 //! configuration of the window manager and to make this accessible to as many people as possible.
-//! 
+//!
 //! This modularity is achieved through a system of _components_. Each component is a separate
 //! program, an isolated group of functionality that is responsible for a specific part of the
 //! window manager. For example, a configuration component might be the program responsible for
@@ -24,7 +24,7 @@ mod aquariwm;
 /// This module provides an assortment of utility traits to ease interaction with [xcb].
 mod extensions;
 
-use tracing::{info, debug, trace};
+use tracing::{debug, info, trace};
 
 use xcb::x::{self, Window};
 use xcb::{Connection, Xid};
