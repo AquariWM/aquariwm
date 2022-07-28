@@ -21,6 +21,10 @@ impl AquariWm {
 	}
 
 	/// Starts AquariWM's event loop to listen and respond to new events.
+    ///
+    /// The event loop blocks until event(s) are received. Upon receiving an event, the type of
+    /// event is matched against and the window manager will react accordingly. Usually this will
+    /// involve sending one or more new requests to the X server in response.
 	pub fn run(&self) -> xcb::Result<()> {
 		info!("Running the window manager");
 		let conn = &self.conn;
