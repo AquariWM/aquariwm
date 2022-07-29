@@ -32,8 +32,8 @@ pub struct WindowManipulation {
 /// At any given time, the user cannot be manipulating more than one window, and the user cannot
 /// be performing more than one type of manipulation on a window at a time.
 ///
-/// The [Type] also contains either the original position (in case of [Type::Moving]) or the
-/// original size (in case of [Type::Resizing]), so that the window manipulation can be
+/// The [Type] also contains either the original position (in case of [Type::_Moving]) or the
+/// original size (in case of [Type::_Resizing]), so that the window manipulation can be
 /// cancelled if necessary.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Type {
