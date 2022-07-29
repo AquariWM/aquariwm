@@ -8,17 +8,22 @@ use xcb::x::{self, Window};
 use xcb::{Connection, Xid};
 
 use crate::extensions::ConfigureRequestEventExtensions;
+use crate::window_manipulation::WindowManipulation;
 
 /// The central object of the entire AquariWM window manager. Contains state and the event loop.
 pub struct AquariWm {
 	conn: Connection,
 	_root: Window,
+    /// Represents the ongoing manipulation of a window, if one is occurring.
+    ///
+    /// [`None`] here means that there is no window being manipulated.
+    _manipulation: Option<WindowManipulation>,
 }
 
 impl AquariWm {
 	/// Starts the window manager by instantiating `Self` and running the event loop.
 	pub fn start(conn: Connection, root: Window) -> xcb::Result<()> {
-		let wm = Self { conn, _root: root };
+		let wm = Self { conn, _root: root, _manipulation: None };
 		wm.run()
 	}
 

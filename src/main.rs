@@ -21,6 +21,9 @@
 /// components.
 mod aquariwm;
 
+/// Keeps track of the manipulation of a window. See [WindowManipulation] for more information.
+mod window_manipulation;
+
 /// This module provides an assortment of utility traits to ease interaction with [xcb].
 pub mod extensions;
 
