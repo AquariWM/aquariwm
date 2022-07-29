@@ -12,19 +12,19 @@ use xcb::x::Window;
 /// be applied relative to where they started).
 #[derive(Debug)]
 pub struct WindowManipulation {
-    /// The window that is currently being manipulated. Can only ever be one at a time.
-    _window: Window,
-    /// The position of the pointer when the manipulation commences.
-    ///
-    /// Used to calculate the manipulation relative to where it began. For example, if you start
-    /// moving a window, and you move the cursor 20 pixels to the right, you want the window to
-    /// move 20 pixels to the right. The cursor position is used to calculate how far the cursor
-    /// has moved.
-    _cursor_pos: (i16, i16),
-    /// Represents the [Type] of manipulation being used on the window and how to reverse it.
-    ///
-    /// See the [Type] enum documentation for more information.
-    _mode: Type,
+	/// The window that is currently being manipulated. Can only ever be one at a time.
+	_window: Window,
+	/// The position of the pointer when the manipulation commences.
+	///
+	/// Used to calculate the manipulation relative to where it began. For example, if you start
+	/// moving a window, and you move the cursor 20 pixels to the right, you want the window to
+	/// move 20 pixels to the right. The cursor position is used to calculate how far the cursor
+	/// has moved.
+	_cursor_pos: (i16, i16),
+	/// Represents the [Type] of manipulation being used on the window and how to reverse it.
+	///
+	/// See the [Type] enum documentation for more information.
+	_mode: Type,
 }
 
 /// [Type] represents the current window manipulation operation of the window manager.
@@ -37,18 +37,14 @@ pub struct WindowManipulation {
 /// cancelled if necessary.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Type {
-    /// Represents a state where the user is currently manipulating a window's position.
-    ///
-    /// Contains the starting position of the window being manipulated so the window can be
-    /// returned to its original position if the manipulation is cancelled.
-    _Moving {
-        original_pos: (i16, i16),
-    },
-    /// Represents a state where the user is currently manipulating a window's dimensions.
-    ///
-    /// Contains the starting dimensions of the window being manipulated so the window can be
-    /// returned to its original size if the manipulation is cancelled.
-    _Resizing {
-        original_size: (u16, u16),
-    },
+	/// Represents a state where the user is currently manipulating a window's position.
+	///
+	/// Contains the starting position of the window being manipulated so the window can be
+	/// returned to its original position if the manipulation is cancelled.
+	_Moving { original_pos: (i16, i16) },
+	/// Represents a state where the user is currently manipulating a window's dimensions.
+	///
+	/// Contains the starting dimensions of the window being manipulated so the window can be
+	/// returned to its original size if the manipulation is cancelled.
+	_Resizing { original_size: (u16, u16) },
 }
