@@ -8,27 +8,65 @@ use xcb::x::{self, Window};
 use xcb::{Connection, Xid};
 
 use crate::extensions::ConfigureRequestEventExtensions;
-use crate::window_manipulation::WindowManipulation;
+use crate::window_manipulation::{WindowManipulation, Type};
 
 /// The central object of the entire AquariWM window manager. Contains state and the event loop.
+#[allow(dead_code)]
 pub struct AquariWm {
 	conn: Connection,
-	_root: Window,
 	/// Represents the ongoing manipulation of a window, if one is occurring.
 	///
 	/// [`None`] here means that there is no window being manipulated.
-	_manipulation: Option<WindowManipulation>,
+	manipulation: Option<WindowManipulation>,
 }
 
+#[allow(dead_code)]
 impl AquariWm {
 	/// Starts the window manager by instantiating `Self` and running the event loop.
-	pub fn start(conn: Connection, root: Window) -> xcb::Result<()> {
+	pub fn start(conn: Connection) -> xcb::Result<()> {
 		let wm = Self {
 			conn,
-			_root: root,
-			_manipulation: None,
+			manipulation: None,
 		};
 		wm.run()
+	}
+
+	/// Gets the currently occuring window manipulation, if any.
+	///
+	/// Returns `Some(WindowManipulation)` if there is a window being manipulated, or `None` if
+	/// there is no window manipulation happening.
+	pub fn manipulation(&self) -> Option<WindowManipulation> {
+		self.manipulation
+	}
+
+	/// Begins window manipulation for the given window if no other window is being manipulated.
+	///
+	/// Returns [`Ok(())`] if the window manipulation was able to begin, or [`Err(())`] if there was
+	/// already a window being manipulated.
+	pub fn manipulate_window(&mut self, window: Window, cursor_pos: (i16, i16), mode: Type) -> Result<(), ()> {
+		if self.manipulation.is_none() {
+			self.manipulation = Some(WindowManipulation {
+				window,
+				cursor_pos,
+				mode,
+			});
+
+			// We were able to begin the window manipulation, as no other window was already being
+			// manipulated.
+			return Ok(());
+		}
+
+		// There was already a window being manipulated, so we were not able to begin the window
+		// manipulation.
+		Err(())
+	}
+
+	/// Cancels the current [`WindowManipulation`], if any. Should only be used if user-initiated.
+	///
+	/// This function [takes](Option::take) the current [`WindowManipulation`] and returns it. The
+	/// window manager's manipulation state is set to [`None`].
+	pub fn cancel_manipulation(&mut self) -> Option<WindowManipulation> {
+		self.manipulation.take()
 	}
 
 	/// Starts AquariWM's event loop to listen and respond to new events.

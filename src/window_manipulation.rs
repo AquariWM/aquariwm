@@ -10,21 +10,21 @@ use xcb::x::Window;
 /// window. It contains information about which [Type] of manipulation is occurring on the window
 /// and the start position of the cursor relative to the window (so that changes to the window can
 /// be applied relative to where they started).
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct WindowManipulation {
 	/// The window that is currently being manipulated. Can only ever be one at a time.
-	_window: Window,
+	pub window: Window,
 	/// The position of the pointer when the manipulation commences.
 	///
 	/// Used to calculate the manipulation relative to where it began. For example, if you start
 	/// moving a window, and you move the cursor 20 pixels to the right, you want the window to
 	/// move 20 pixels to the right. The cursor position is used to calculate how far the cursor
 	/// has moved.
-	_cursor_pos: (i16, i16),
+	pub cursor_pos: (i16, i16),
 	/// Represents the [Type] of manipulation being used on the window and how to reverse it.
 	///
 	/// See the [Type] enum documentation for more information.
-	_mode: Type,
+	pub mode: Type,
 }
 
 /// [Type] represents the current window manipulation operation of the window manager.

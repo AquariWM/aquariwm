@@ -129,7 +129,7 @@ fn main() -> xcb::Result<()> {
 
 	// It is now time to finalize the initialization of AquariWM by instantiating the main window
 	// manager.
-	AquariWm::start(conn, root)
+	AquariWm::start(conn)
 }
 
 /// Initializes the given [window](x::Window) by requesting to receive certain events on it.
