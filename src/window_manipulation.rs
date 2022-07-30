@@ -4,8 +4,10 @@
 
 use tracing::{debug, trace};
 
-use xcb::x::{self, ConfigWindow, Window};
+use xcb::x::{self, Window};
 use xcb::{Connection, Xid};
+
+use crate::util;
 
 /// Represents the state of an ongoing window manipulation.
 ///
@@ -65,7 +67,6 @@ pub enum WindowManipulation {
 	},
 }
 
-#[allow(dead_code)]
 impl WindowManipulation {
 	/// Creates a [`WindowManipulation::Moving`] window manipulation.
 	///
@@ -75,7 +76,7 @@ impl WindowManipulation {
 	/// Flushes the connection.
 	pub fn moving(conn: &Connection, window: Window, cursor_pos: (i16, i16)) -> xcb::Result<Self> {
 		// Get geometry request to get the window's coordinates.
-		let geometry_req = get_geometry(conn, window);
+		let geometry_req = util::get_geometry(conn, window);
 
 		// Window tree request to get the window's parent.
 		trace!(window = window.resource_id(), "Requesting window tree");
@@ -109,7 +110,7 @@ impl WindowManipulation {
 		cursor_pos: (i16, i16),
 	) -> xcb::Result<Self> {
 		// Get geometry request to get the window's dimensions.
-		let geometry = conn.wait_for_reply(get_geometry(conn, window))?;
+		let geometry = conn.wait_for_reply(util::get_geometry(conn, window))?;
 
 		debug!(
 			window = window.resource_id(),
@@ -169,7 +170,7 @@ impl WindowManipulation {
 					orig_y = orig_coords.1,
 					"Cancelling window manipulation and undoing changes"
 				);
-				set_position(conn, window, (orig_coords.0 as i32, orig_coords.1 as i32));
+				util::set_position(conn, window, (orig_coords.0 as i32, orig_coords.1 as i32));
 			}
 			Self::Resizing {
 				window, orig_size, ..
@@ -181,7 +182,7 @@ impl WindowManipulation {
 					orig_height = orig_size.1,
 					"Cancelling window manipulation and undoing changes"
 				);
-				set_dimensions(conn, window, (orig_size.0 as u32, orig_size.1 as u32));
+				util::set_dimensions(conn, window, (orig_size.0 as u32, orig_size.1 as u32));
 			}
 		}
 
@@ -190,7 +191,7 @@ impl WindowManipulation {
 	}
 
 	/// The window this window manipulation applies to.
-	pub fn window(self) -> Window {
+	pub const fn window(self) -> Window {
 		match self {
 			Self::Moving { window, .. } => window,
 			Self::Resizing { window, .. } => window,
@@ -201,7 +202,7 @@ impl WindowManipulation {
 	///
 	/// See also: [`cursor_x()`](WindowManipulation::cursor_x),
 	/// [`cursor_y()`](WindowManipulation::cursor_y)
-	pub fn cursor_pos(self) -> (i16, i16) {
+	pub const fn cursor_pos(self) -> (i16, i16) {
 		match self {
 			Self::Moving { cursor_pos, .. } => cursor_pos,
 			Self::Resizing { cursor_pos, .. } => cursor_pos,
@@ -212,7 +213,8 @@ impl WindowManipulation {
 	///
 	/// See also: [`cursor_pos()`](WindowManipulation::cursor_pos),
 	/// [`cursor_y()`](WindowManipulation::cursor_y)
-	pub fn cursor_x(self) -> i16 {
+	#[allow(dead_code)]
+	pub const fn cursor_x(self) -> i16 {
 		self.cursor_pos().0
 	}
 
@@ -220,15 +222,18 @@ impl WindowManipulation {
 	///
 	/// See also: [`cursor_pos()`](WindowManipulation::cursor_pos),
 	/// [`cursor_y()`](WindowManipulation::cursor_y)
-	pub fn cursor_y(self) -> i16 {
+	#[allow(dead_code)]
+	pub const fn cursor_y(self) -> i16 {
 		self.cursor_pos().1
 	}
 
 	/// The difference between the given cursor position and the starting
 	/// [`cursor_pos()`](WindowManipulation::cursor_pos).
 	///
-	/// See also: [`diff_x(x: i16)`], [`diff_y(y: i16)`]
-	pub fn diff(self, cursor_pos: (i16, i16)) -> (i16, i16) {
+	/// See also: [`diff_x(x: i16)`](WindowManipulation::diff_x),
+	/// [`diff_y(y: i16)`](WindowManipulation::diff_y)
+	#[allow(dead_code)]
+	pub const fn diff(self, cursor_pos: (i16, i16)) -> (i16, i16) {
 		(self.diff_x(cursor_pos.0), self.diff_y(cursor_pos.1))
 	}
 
@@ -237,7 +242,7 @@ impl WindowManipulation {
 	///
 	/// See also: [`diff(cursor_pos: (i16, i16))`](WindowManipulation::diff),
 	/// [`diff_y(y: i16)`](WindowManipulation::diff_y)
-	pub fn diff_x(self, x: i16) -> i16 {
+	pub const fn diff_x(self, x: i16) -> i16 {
 		x - self.cursor_pos().0
 	}
 
@@ -246,7 +251,7 @@ impl WindowManipulation {
 	///
 	/// See also: [`diff(cursor_pos: (i16, i16))`](WindowManipulation::diff),
 	/// [`diff_x(x: i16)`](WindowManipulation::diff_x)
-	pub fn diff_y(self, y: i16) -> i16 {
+	pub const fn diff_y(self, y: i16) -> i16 {
 		y - self.cursor_pos().1
 	}
 
@@ -261,7 +266,7 @@ impl WindowManipulation {
 				orig_coords,
 				..
 			} => {
-				set_position(
+				util::set_position(
 					conn,
 					window,
 					(
@@ -312,63 +317,10 @@ impl WindowManipulation {
 
 				// TODO: This sends far too many requests! We need to make sure that not too many
 				//       changes to the window's dimensions are sent, or the X server melts.
-				set_dimensions(conn, window, dimensions);
+				util::set_dimensions(conn, window, dimensions);
 			}
 		}
 
 		Ok(())
 	}
-}
-
-/// Sends a [GetGeometry](xcb::x::GetGeometry) request for the given window and returns its reply.
-///
-/// Does not flush the connection.
-///
-/// TODO: Move out to utility module.
-fn get_geometry(conn: &Connection, window: Window) -> x::GetGeometryCookie {
-	trace!(window = window.resource_id(), "Requesting window geometry");
-	conn.send_request(&x::GetGeometry {
-		drawable: x::Drawable::Window(window),
-	})
-}
-
-/// Sends a [ConfigureWindow](xcb::x::ConfigureWindow) request to change the coordinates of the
-/// given window.
-///
-/// Does not flush the connection.
-///
-/// TODO: Move out to utility module.
-fn set_position(conn: &Connection, window: Window, coords: (i32, i32)) {
-	trace!(
-		window = window.resource_id(),
-		x = coords.0,
-		y = coords.1,
-		"Configuring window coordinates"
-	);
-	conn.send_request(&x::ConfigureWindow {
-		window,
-		value_list: &[ConfigWindow::X(coords.0), ConfigWindow::Y(coords.1)],
-	});
-}
-
-/// Sends a [ConfigureWindow](xcb::x::ConfigureWindow) request to change the dimensions of the
-/// given window.
-///
-/// Does not flush the connection.
-///
-/// TODO: Move out to utility module.
-fn set_dimensions(conn: &Connection, window: Window, dimensions: (u32, u32)) {
-	trace!(
-		window = window.resource_id(),
-		width = dimensions.0,
-		y = dimensions.1,
-		"Configuring window dimensions"
-	);
-	conn.send_request(&x::ConfigureWindow {
-		window,
-		value_list: &[
-			ConfigWindow::Width(dimensions.0),
-			ConfigWindow::Height(dimensions.1),
-		],
-	});
 }

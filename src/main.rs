@@ -28,9 +28,12 @@ mod window_manipulation;
 /// This module provides an assortment of utility traits to ease interaction with [xcb].
 pub mod extensions;
 
+/// Contains utilities for sending X requests, especially for queries or initialization on windows.
+pub mod util;
+
 use tracing::{debug, info, trace};
 
-use xcb::x::{self, Window};
+use xcb::x;
 use xcb::{Connection, Xid};
 
 use crate::aquariwm::AquariWm;
@@ -112,11 +115,11 @@ fn main() -> xcb::Result<()> {
 		.zip(windows)
 		.for_each(|(reply, window)| {
 			if reply.is_ok() && reply.unwrap().map_state() == x::MapState::Viewable {
-				init_window(&conn, window).ok();
+				util::init_window(&conn, *window);
 			}
 		});
 
-	// After [`init_window`] initializes all the windows (which involves sending requests), we
+	// After [`util::init_window`] initializes all the windows (which involves sending requests), we
 	// flush the connection to send all of those queued requests at once.
 	conn.flush()?;
 
@@ -124,45 +127,6 @@ fn main() -> xcb::Result<()> {
 
 	// It is now time to finalize the initialization of AquariWM by instantiating the main window
 	// manager.
-	AquariWm::start(conn, root)?;
-	Ok(())
-}
-
-/// Initializes the given [window](x::Window) by requesting to receive certain events on it.
-///
-/// Grabs all button presses, releases and drags when the Super key (mod mask 4) is held, and
-/// registers for the following events:
-/// - [`ENTER_WINDOW`](x::EventMask::ENTER_WINDOW)
-/// - [`FOCUS_CHANGE`](x::EventMask::FOCUS_CHANGE)
-fn init_window(conn: &Connection, window: &Window) -> xcb::Result<()> {
-	trace!(
-		window = window.resource_id(),
-		"Grabbing mouse buttons on window"
-	);
-	conn.send_request(&x::GrabButton {
-		owner_events: false,
-		grab_window: *window,
-		event_mask: x::EventMask::BUTTON_PRESS
-			| x::EventMask::BUTTON_RELEASE
-			| x::EventMask::BUTTON_MOTION,
-		pointer_mode: x::GrabMode::Async,
-		keyboard_mode: x::GrabMode::Async,
-		confine_to: x::WINDOW_NONE,
-		cursor: x::CURSOR_NONE,
-		button: x::ButtonIndex::Any,
-		modifiers: x::ModMask::N4,
-	});
-
-	trace!(
-		window = window.resource_id(),
-		"Registering for events on window"
-	);
-	conn.send_request(&x::ChangeWindowAttributes {
-		window: *window,
-		value_list: &[x::Cw::EventMask(
-			x::EventMask::FOCUS_CHANGE | x::EventMask::ENTER_WINDOW,
-		)],
-	});
-
+	AquariWm::start(conn)?;
 	Ok(())
 }
