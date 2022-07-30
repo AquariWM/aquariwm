@@ -19,29 +19,15 @@ use xcb::x::{self, Window, ConfigWindow};
 /// when it ends.
 ///
 /// Does not flush the connection.
-pub fn init_window(conn: &Connection, window: &Window) {
-	trace!(
-		window = window.resource_id(),
-		"Grabbing mouse buttons on window"
-	);
-	conn.send_request(&x::GrabButton {
-		owner_events: false,
-		grab_window: *window,
-		event_mask: x::EventMask::BUTTON_PRESS,
-		pointer_mode: x::GrabMode::Async,
-		keyboard_mode: x::GrabMode::Async,
-		confine_to: x::WINDOW_NONE,
-		cursor: x::CURSOR_NONE,
-		button: x::ButtonIndex::Any,
-		modifiers: x::ModMask::N4,
-	});
+pub fn init_window(conn: &Connection, window: Window) {
+	init_grabs(conn, window);
 
 	trace!(
 		window = window.resource_id(),
 		"Registering for events on window"
 	);
 	conn.send_request(&x::ChangeWindowAttributes {
-		window: *window,
+		window,
 		value_list: &[x::Cw::EventMask(
 			x::EventMask::FOCUS_CHANGE | x::EventMask::ENTER_WINDOW,
 		)],
@@ -92,5 +78,51 @@ pub fn set_dimensions(conn: &Connection, window: Window, dimensions: (u32, u32))
 			ConfigWindow::Width(dimensions.0),
 			ConfigWindow::Height(dimensions.1),
 		],
+	});
+}
+
+/// Grabs button presses on the window when the Super key is held.
+///
+/// Used to initiate window manipulations.
+///
+/// Does not flush the connection.
+pub fn init_grabs(conn: &Connection, window: Window) {
+	trace!(
+		window = window.resource_id(),
+		"Grabbing button presses on window"
+	);
+	conn.send_request(&x::GrabButton {
+		owner_events: false,
+		grab_window: window,
+		event_mask: x::EventMask::BUTTON_PRESS,
+		pointer_mode: x::GrabMode::Async,
+		keyboard_mode: x::GrabMode::Async,
+		confine_to: x::WINDOW_NONE,
+		cursor: x::CURSOR_NONE,
+		button: x::ButtonIndex::Any,
+		modifiers: x::ModMask::N4,
+	});
+}
+
+/// Grabs button motion and releases on the root window.
+///
+/// Used when a window is being manipulated.
+///
+/// Does not flush the connection.
+pub fn grab_manip_buttons(conn: &Connection, window: Window) {
+	trace!(
+		window = window.resource_id(),
+		"Grabbing button motion and releases on window"
+	);
+	conn.send_request(&x::GrabButton {
+		owner_events: false,
+		grab_window: window,
+		event_mask: x::EventMask::BUTTON_MOTION | x::EventMask::BUTTON_RELEASE,
+		pointer_mode: x::GrabMode::Async,
+		keyboard_mode: x::GrabMode::Async,
+		confine_to: x::WINDOW_NONE,
+		cursor: x::CURSOR_NONE,
+		button: x::ButtonIndex::Any,
+		modifiers: x::ModMask::ANY,
 	});
 }

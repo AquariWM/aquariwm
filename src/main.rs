@@ -115,11 +115,11 @@ fn main() -> xcb::Result<()> {
 		.zip(windows)
 		.for_each(|(reply, window)| {
 			if reply.is_ok() && reply.unwrap().map_state() == x::MapState::Viewable {
-				util::init_window(&conn, window);
+				util::init_window(&conn, *window);
 			}
 		});
 
-	// After [`init_window`] initializes all the windows (which involves sending requests), we
+	// After [`util::init_window`] initializes all the windows (which involves sending requests), we
 	// flush the connection to send all of those queued requests at once.
 	conn.flush()?;
 

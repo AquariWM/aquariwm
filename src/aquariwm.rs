@@ -60,7 +60,7 @@ impl AquariWm {
 						window = window.resource_id(),
 						"Setting up newly mapped window"
 					);
-					util::init_window(&self.conn, &window);
+					util::init_window(&self.conn, window);
 					self.conn.flush()?;
 				}
 				// Start window manipulation if no other window manipulation is already happening.
@@ -75,6 +75,9 @@ impl AquariWm {
 						if notif.detail() == x::ButtonIndex::N1 as u8 {
 							self.manipulation =
 								Some(WindowManipulation::moving(&self.conn, window, cursor_pos)?);
+
+							util::grab_manip_buttons(&self.conn, window);
+							self.conn.flush()?;
 						}
 
 						// If the secondary mouse button is pressed, and there is no ongoing
@@ -83,6 +86,9 @@ impl AquariWm {
 							self.manipulation = Some(WindowManipulation::resizing(
 								&self.conn, window, cursor_pos,
 							)?);
+
+							util::grab_manip_buttons(&self.conn, window);
+							self.conn.flush()?;
 						}
 					}
 				}
@@ -95,20 +101,26 @@ impl AquariWm {
 					if self.manipulation.is_some() {
 						let manipulation = self.manipulation.unwrap();
 
-						if manipulation.is_moving() && notif.detail() == x::ButtonIndex::N1 as u8 {
+						if (manipulation.is_moving()
+							&& notif.detail() == x::ButtonIndex::N1 as u8)
+							|| (manipulation.is_resizing()
+								&& notif.detail() == x::ButtonIndex::N3 as u8) {
 							debug!(
 								window = manipulation.window().resource_id(),
 								"Ending window manipulation"
 							);
-							self.manipulation = None;
-						}
+							
+							trace!(
+								window = manipulation.window().resource_id(),
+								"Ungrabbing buttons on window"
+							);
+							self.conn.send_request(&x::UngrabButton {
+								grab_window: manipulation.window(),
+								button: x::ButtonIndex::Any,
+								modifiers: x::ModMask::ANY,
+							});
+							util::init_grabs(&self.conn, manipulation.window());
 
-						if manipulation.is_resizing() && notif.detail() == x::ButtonIndex::N3 as u8
-						{
-							debug!(
-								window = manipulation.window().resource_id(),
-								"Ending window manipulation"
-							);
 							self.manipulation = None;
 						}
 					}
