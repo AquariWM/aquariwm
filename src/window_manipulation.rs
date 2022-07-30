@@ -131,7 +131,7 @@ impl WindowManipulation {
 	/// ```
 	///
 	/// See also: [`matches!`]
-	pub fn is_moving(self) -> bool {
+	pub const fn is_moving(self) -> bool {
 		matches!(self, Self::Moving { .. })
 	}
 
@@ -144,7 +144,7 @@ impl WindowManipulation {
 	/// ```
 	///
 	/// See also: [`matches!`]
-	pub fn is_resizing(self) -> bool {
+	pub const fn is_resizing(self) -> bool {
 		matches!(self, Self::Resizing { .. })
 	}
 
