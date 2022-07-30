@@ -34,9 +34,7 @@ impl AquariWm {
 		wm.run()
 	}
 
-	/// The event loop blocks until event(s) are received. Upon receiving an event, the type of
-	/// event is matched against and the window manager will react accordingly. Usually this will
-	/// involve sending one or more new requests to the X server in response.
+	/// Loops through queued events, blocking if none are available until there are.
 	fn run(mut self) -> xcb::Result<()> {
 		info!("Running the window manager");
 		loop {

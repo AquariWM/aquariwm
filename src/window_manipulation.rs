@@ -76,7 +76,9 @@ impl WindowManipulation {
 	pub fn moving(conn: &Connection, window: Window, cursor_pos: (i16, i16)) -> xcb::Result<Self> {
 		// Get geometry request to get the window's coordinates.
 		let geometry_req = get_geometry(conn, window);
+
 		// Window tree request to get the window's parent.
+		trace!(window = window.resource_id(), "Requesting window tree");
 		let tree_req = conn.send_request(&x::QueryTree { window });
 
 		conn.flush()?;
@@ -149,9 +151,8 @@ impl WindowManipulation {
 		match self {
 			Self::Moving {
 				window,
-				parent: _,
 				orig_coords,
-				cursor_pos: _,
+				..
 			} => {
 				// If `Moving`, set the window's position to `orig_coords`.
 				debug!(
@@ -165,7 +166,7 @@ impl WindowManipulation {
 			Self::Resizing {
 				window,
 				orig_size,
-				cursor_pos: _,
+				..
 			} => {
 				// If `Resizing`, set the window's dimensions to `orig_size`.
 				debug!(
