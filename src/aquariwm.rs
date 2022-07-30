@@ -4,31 +4,26 @@
 
 use tracing::{debug, info, trace};
 
-use xcb::x::{self, Window};
-use xcb::{Connection, Xid};
+use xcb::{x, Connection, Xid};
 
+use crate::util;
 use crate::extensions::ConfigureRequestEventExtensions;
 use crate::window_manipulation::WindowManipulation;
 
 /// The central object of the entire AquariWM window manager. Contains state and the event loop.
-#[allow(dead_code)]
 pub struct AquariWm {
 	conn: Connection,
-	/// The root window of the screen.
-	root: Window,
 	/// Represents the ongoing manipulation of a window, if one is occurring.
 	///
 	/// [`None`] here means that there is no window being manipulated.
 	manipulation: Option<WindowManipulation>,
 }
 
-#[allow(dead_code)]
 impl AquariWm {
 	/// Starts the window manager by instantiating `Self` and running the event loop.
-	pub fn start(conn: Connection, root: Window) -> xcb::Result<()> {
+	pub fn start(conn: Connection) -> xcb::Result<()> {
 		let wm = Self {
 			conn,
-			root,
 			manipulation: None,
 		};
 		wm.run()
@@ -65,7 +60,7 @@ impl AquariWm {
 						window = window.resource_id(),
 						"Setting up newly mapped window"
 					);
-					crate::init_window(&self.conn, &window)?;
+					util::init_window(&self.conn, &window);
 					self.conn.flush()?;
 				}
 				// Start window manipulation if no other window manipulation is already happening.
@@ -132,6 +127,11 @@ impl AquariWm {
 				}
 				// Focus whatever window the cursor enters.
 				xcb::Event::X(x::Event::EnterNotify(notif)) => {
+					// TODO: Don't focus the window if the `EnterNotify` event was generated in
+					//       response to the window being brought to the top of the stack because
+					//       it was focused. Currently, this can easily lead to an infinite loop.
+					//       Tip: ICCCM or EWMH may contain information regarding placing a flag
+					//            somewhere that can help with this? I haven't looked into it.
 					trace!(
 						window = notif.event().resource_id(),
 						"Focusing window entered by cursor"
