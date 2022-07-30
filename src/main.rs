@@ -21,9 +21,15 @@
 /// components.
 mod aquariwm;
 
-/// Keeps track of the manipulation of a window. See
-/// [WindowManipulation](window_manipulation::WindowManipulation) for more information.
-mod window_manipulation;
+/// The `features` module contains various other modules for functionality of AquariWM.
+///
+/// These features are notably _not_ components in their own right, though they may act as bridges
+/// to components that affect their functionality.
+///
+/// Features within the `features` module may be re-exported from private modules with `pub use` to
+/// simplify other `use` statements, or, if a feature contains many items that are intended to be
+/// used in other modules, that feature may be exported as its entire module with `pub mod`.
+mod features;
 
 /// This module provides an assortment of utility traits to ease interaction with [xcb].
 pub mod extensions;

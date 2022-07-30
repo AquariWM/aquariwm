@@ -8,7 +8,7 @@ use xcb::{x, Connection, Xid};
 
 use crate::extensions::ConfigureRequestEventExtensions;
 use crate::util;
-use crate::window_manipulation::WindowManipulation;
+use crate::features::WindowManipulation;
 
 /// The central object of the entire AquariWM window manager. Contains state and the event loop.
 pub struct AquariWm {
