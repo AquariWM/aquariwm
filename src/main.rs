@@ -21,12 +21,19 @@
 /// components.
 mod aquariwm;
 
+/// Keeps track of the manipulation of a window. See
+/// [WindowManipulation](window_manipulation::WindowManipulation) for more information.
+mod window_manipulation;
+
 /// This module provides an assortment of utility traits to ease interaction with [xcb].
 pub mod extensions;
 
+/// Contains utilities for sending X requests, especially for queries or initialization on windows.
+pub mod util;
+
 use tracing::{debug, info, trace};
 
-use xcb::x::{self, Window};
+use xcb::x;
 use xcb::{Connection, Xid};
 
 use crate::aquariwm::AquariWm;
@@ -34,38 +41,7 @@ use crate::aquariwm::AquariWm;
 /// The main entrypoint for AquariWM; `main` is responsible for initalization/setup.
 fn main() -> xcb::Result<()> {
 	// Initialize the default [`tracing`] subscriber so that all logged messages are printed to
-	// the console. AquariWM values the heavy use of log messages throughout the codebase. You
-	// should use the different log levels as follows:
-	//
-	// - `Trace`
-	//   You should use the `Trace` level often - it is the most verbose log level, and should
-	//   be used for any small operation which could affect the running of the window manager.
-	//   For example, you should generally make a `Trace` level message for every request sent to
-	//   the X server.
-	//
-	// - `Debug`
-	//   Use the `Debug` level for a more easily understood grouping of operations. For example,
-	//   a `Debug` level message might say:
-	//   > Registering for events on existing windows
-	//
-	// - `Info`
-	//   The `Info` log level should be used relatively sparingly. It describes bigger steps in
-	//   the operation of AquariWM, for example:
-	//   > Initializing AquariWM
-	//   or:
-	//   > Loading configuration
-	//
-	// - `Warn`
-	//   The `Warn` level should be used when actual functionality or features of the window
-	//   manager are hindered or restricted because of a problem encountered, but that problem was
-	//   not critical to the continued running of the window manager. It can also be used for
-	//   alerting users of unwise or not-recommended configuration setups, even if they may wish
-	//   to proceed with them nonetheless. That might particularly include the use of experimental
-	//   features, for example.
-	//
-	// - `Error`
-	//   Use the `Error` log level only for critical errors that can cause entire components or
-	//   the window manager itself to no longer be able to continue to run properly.
+	// the console. AquariWM values the heavy use of log messages throughout the codebase.
 	tracing_subscriber::fmt()
 		.pretty()
 		.with_max_level(tracing::Level::TRACE)
@@ -76,10 +52,7 @@ fn main() -> xcb::Result<()> {
 	info!("Starting AquariWM");
 
 	let (conn, screen_id) = Connection::connect(None)?;
-	debug!(
-		"Established connection to the X server on screen {}",
-		screen_id
-	);
+	debug!(screen = screen_id, "Established connection to the X server",);
 
 	let root = conn
 		.get_setup()
@@ -89,17 +62,15 @@ fn main() -> xcb::Result<()> {
 		.root();
 
 	// Send a request for substructure redirection on the root window (required for the window
-	// manager to function, only one client can have substructure redirection at once), among
-	// other events.
-	debug!("Registering for events on root window");
+	// manager to function, only one client can have substructure redirection at once).
+	debug!(
+		window = root.resource_id(),
+		"Registering for events on root window"
+	);
 	conn.send_and_check_request(&x::ChangeWindowAttributes {
 		window: root,
 		value_list: &[x::Cw::EventMask(
-			x::EventMask::SUBSTRUCTURE_REDIRECT
-				| x::EventMask::SUBSTRUCTURE_NOTIFY
-				| x::EventMask::BUTTON_PRESS
-				| x::EventMask::BUTTON_RELEASE
-				| x::EventMask::BUTTON_MOTION,
+			x::EventMask::SUBSTRUCTURE_REDIRECT | x::EventMask::SUBSTRUCTURE_NOTIFY,
 		)],
 	})
 	.expect("Uh oh! Couldn't start AquariWM because there was already a window manager running");
@@ -112,7 +83,10 @@ fn main() -> xcb::Result<()> {
 	//
 	// Well, it could have, but the relevant events that will trigger the setup for those windows
 	// won't have been processed yet, and that's what actually matters.
-	trace!("Sending a query for the current window tree");
+	trace!(
+		window = root.resource_id(),
+		"Sending a query for the current window tree"
+	);
 	let query = conn.send_request(&x::QueryTree { window: root });
 
 	// We receive a reply to the query. It isn't actually necessary for us to receive this reply
@@ -141,11 +115,11 @@ fn main() -> xcb::Result<()> {
 		.zip(windows)
 		.for_each(|(reply, window)| {
 			if reply.is_ok() && reply.unwrap().map_state() == x::MapState::Viewable {
-				init_window(&conn, window).ok();
+				util::init_window(&conn, *window);
 			}
 		});
 
-	// After [`init_window`] initializes all the windows (which involves sending requests), we
+	// After [`util::init_window`] initializes all the windows (which involves sending requests), we
 	// flush the connection to send all of those queued requests at once.
 	conn.flush()?;
 
@@ -153,26 +127,6 @@ fn main() -> xcb::Result<()> {
 
 	// It is now time to finalize the initialization of AquariWM by instantiating the main window
 	// manager.
-	let wm = AquariWm::new(conn, root);
-	// TODO: Explore possible options for making this cleaner/more idiomatic. Ideally,
-	//       instantiating the window manager and running the event loop would be the same
-	//       function call.
-	wm.run()
-}
-
-/// Initializes the given [window](x::Window) by requesting to receive certain events on it.
-///
-/// Requests to receive the following events:
-/// - [`ENTER_WINDOW`](x::EventMask::ENTER_WINDOW)
-/// - [`FOCUS_CHANGE`](x::EventMask::FOCUS_CHANGE)
-fn init_window(conn: &Connection, window: &Window) -> xcb::Result<()> {
-	trace!("Initializing window ({})", window.resource_id());
-	conn.send_request(&x::ChangeWindowAttributes {
-		window: *window,
-		value_list: &[x::Cw::EventMask(
-			x::EventMask::ENTER_WINDOW | x::EventMask::FOCUS_CHANGE,
-		)],
-	});
-
+	AquariWm::start(conn)?;
 	Ok(())
 }
