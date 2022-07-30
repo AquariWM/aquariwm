@@ -86,6 +86,10 @@ impl WindowManipulation {
 		let geometry = conn.wait_for_reply(geometry_req)?;
 		let tree = conn.wait_for_reply(tree_req)?;
 
+		debug!(
+			window = window.resource_id(),
+			"Beginning window manipulation"
+		);
 		Ok(Self::Moving {
 			window,
 			parent: tree.parent(),
@@ -107,6 +111,10 @@ impl WindowManipulation {
 		// Get geometry request to get the window's dimensions.
 		let geometry = conn.wait_for_reply(get_geometry(conn, window))?;
 
+		debug!(
+			window = window.resource_id(),
+			"Beginning window manipulation"
+		);
 		Ok(Self::Resizing {
 			window,
 			orig_size: (geometry.width(), geometry.height()),
@@ -164,9 +172,7 @@ impl WindowManipulation {
 				set_position(conn, window, (orig_coords.0 as i32, orig_coords.1 as i32));
 			}
 			Self::Resizing {
-				window,
-				orig_size,
-				..
+				window, orig_size, ..
 			} => {
 				// If `Resizing`, set the window's dimensions to `orig_size`.
 				debug!(

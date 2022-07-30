@@ -101,11 +101,19 @@ impl AquariWm {
 						let manipulation = self.manipulation.unwrap();
 
 						if manipulation.is_moving() && notif.detail() == x::ButtonIndex::N1 as u8 {
+							debug!(
+								window = manipulation.window().resource_id(),
+								"Ending window manipulation"
+							);
 							self.manipulation = None;
 						}
 
 						if manipulation.is_resizing() && notif.detail() == x::ButtonIndex::N3 as u8
 						{
+							debug!(
+								window = manipulation.window().resource_id(),
+								"Ending window manipulation"
+							);
 							self.manipulation = None;
 						}
 					}
