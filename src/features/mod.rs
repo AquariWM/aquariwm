@@ -6,6 +6,9 @@
 /// [WindowManipulation](window_manipulation::WindowManipulation) enum for more information.
 mod window_manipulation;
 
+/// TODO: Stub
+pub mod desktops;
+
 // Re-export the [window_manipulation] module, so as to avoid repeating the name of the feature
 // twice.
 pub use window_manipulation::WindowManipulation;
