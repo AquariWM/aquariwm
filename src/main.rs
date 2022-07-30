@@ -59,8 +59,7 @@ fn main() -> xcb::Result<()> {
 		.root();
 
 	// Send a request for substructure redirection on the root window (required for the window
-	// manager to function, only one client can have substructure redirection at once), among
-	// other events.
+	// manager to function, only one client can have substructure redirection at once).
 	debug!(
 		window = root.resource_id(),
 		"Registering for events on root window"
@@ -68,11 +67,7 @@ fn main() -> xcb::Result<()> {
 	conn.send_and_check_request(&x::ChangeWindowAttributes {
 		window: root,
 		value_list: &[x::Cw::EventMask(
-			x::EventMask::SUBSTRUCTURE_REDIRECT
-				| x::EventMask::SUBSTRUCTURE_NOTIFY
-				| x::EventMask::BUTTON_PRESS
-				| x::EventMask::BUTTON_RELEASE
-				| x::EventMask::BUTTON_MOTION,
+			x::EventMask::SUBSTRUCTURE_REDIRECT | x::EventMask::SUBSTRUCTURE_NOTIFY,
 		)],
 	})
 	.expect("Uh oh! Couldn't start AquariWM because there was already a window manager running");
@@ -129,20 +124,43 @@ fn main() -> xcb::Result<()> {
 
 	// It is now time to finalize the initialization of AquariWM by instantiating the main window
 	// manager.
-	AquariWm::start(conn)
+	AquariWm::start(conn, root)?;
+	Ok(())
 }
 
 /// Initializes the given [window](x::Window) by requesting to receive certain events on it.
 ///
-/// Requests to receive the following events:
+/// Grabs all button presses, releases and drags when the Super key (mod mask 4) is held, and
+/// registers for the following events:
 /// - [`ENTER_WINDOW`](x::EventMask::ENTER_WINDOW)
 /// - [`FOCUS_CHANGE`](x::EventMask::FOCUS_CHANGE)
 fn init_window(conn: &Connection, window: &Window) -> xcb::Result<()> {
-	trace!(window = window.resource_id(), "Initializing window");
+	trace!(
+		window = window.resource_id(),
+		"Grabbing mouse buttons on window"
+	);
+	conn.send_request(&x::GrabButton {
+		owner_events: false,
+		grab_window: *window,
+		event_mask: x::EventMask::BUTTON_PRESS
+			| x::EventMask::BUTTON_RELEASE
+			| x::EventMask::BUTTON_MOTION,
+		pointer_mode: x::GrabMode::Async,
+		keyboard_mode: x::GrabMode::Async,
+		confine_to: x::WINDOW_NONE,
+		cursor: x::CURSOR_NONE,
+		button: x::ButtonIndex::Any,
+		modifiers: x::ModMask::N4,
+	});
+
+	trace!(
+		window = window.resource_id(),
+		"Registering for events on window"
+	);
 	conn.send_request(&x::ChangeWindowAttributes {
 		window: *window,
 		value_list: &[x::Cw::EventMask(
-			x::EventMask::ENTER_WINDOW | x::EventMask::FOCUS_CHANGE,
+			x::EventMask::FOCUS_CHANGE | x::EventMask::ENTER_WINDOW,
 		)],
 	});
 
