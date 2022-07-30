@@ -4,8 +4,8 @@
 
 use tracing::trace;
 
+use xcb::x::{self, ConfigWindow, Window};
 use xcb::{Connection, Xid};
-use xcb::x::{self, Window, ConfigWindow};
 
 /// Initializes the given [window](x::Window) by requesting to receive certain events on it.
 ///

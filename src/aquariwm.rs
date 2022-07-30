@@ -6,8 +6,8 @@ use tracing::{debug, info, trace};
 
 use xcb::{x, Connection, Xid};
 
-use crate::util;
 use crate::extensions::ConfigureRequestEventExtensions;
+use crate::util;
 use crate::window_manipulation::WindowManipulation;
 
 /// The central object of the entire AquariWM window manager. Contains state and the event loop.
@@ -101,15 +101,15 @@ impl AquariWm {
 					if self.manipulation.is_some() {
 						let manipulation = self.manipulation.unwrap();
 
-						if (manipulation.is_moving()
-							&& notif.detail() == x::ButtonIndex::N1 as u8)
+						if (manipulation.is_moving() && notif.detail() == x::ButtonIndex::N1 as u8)
 							|| (manipulation.is_resizing()
-								&& notif.detail() == x::ButtonIndex::N3 as u8) {
+								&& notif.detail() == x::ButtonIndex::N3 as u8)
+						{
 							debug!(
 								window = manipulation.window().resource_id(),
 								"Ending window manipulation"
 							);
-							
+
 							trace!(
 								window = manipulation.window().resource_id(),
 								"Ungrabbing buttons on window"
