@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# This is a short script to build `aquariwm-server`'s documentation and publish it to GitHub Pages.
+# You can see the GitHub Pages site at https://docs.aquariwm.org/
+
+cargo clean
+cargo doc
+rm -rf ./docs
+echo "<meta http-equiv=\"refresh\" content=\"0; url=aquariwm_server\">" > ./target/doc/index.html
+cp -r ./target/doc ./docs

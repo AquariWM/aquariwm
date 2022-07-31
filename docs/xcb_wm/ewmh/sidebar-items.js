@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["proto","Request and response definitions for the ewmh protocol"]],"struct":[["Atoms","Interned [`xcb::x::Atom`]s for the `ewmh` protocol"],["Connection","The main `ewmh` entry point"]]});
