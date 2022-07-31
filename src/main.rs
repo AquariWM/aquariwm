@@ -37,7 +37,7 @@
 //! can be added or replaced in AquariWM without affecting any other part of the window manager.
 //! Changing the way part of AquariWM works is as simple as launching a different component.
 
-/// The central module of `aquariwm-core`. Responsible for overseeing AquariWM's state and
+/// The central module of `aquariwm-server`. Responsible for overseeing AquariWM's state and
 /// operation.
 ///
 /// The `aquariwm` module can be thought of as the brain behind AquariWM. It keeps track of the
