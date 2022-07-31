@@ -5,6 +5,13 @@
 /// This module provides an assortment of utility traits to ease interaction with [xcb].
 mod extensions;
 
+/// Contains setup and utilities for
+/// [ICCCM](https://x.org/releases/X11R7.6/doc/xorg-docs/specs/ICCCM/icccm.html) compliance.
+mod icccm;
+/// Contains setup and utilities for
+/// [EWMH](https://specifications.freedesktop.org/wm-spec/latest) compliance.
+mod ewmh;
+
 // Re-export extensions module.
 pub use extensions::*;
 
