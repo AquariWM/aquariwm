@@ -8,6 +8,27 @@
 //! provide clear and extensive documentation and guides for users, contributors and clientmakers
 //! alike, and by maintaining a friendly and welcoming community that encourages participation.
 //!
+//! # TODO
+//! To-do list follows. This section is simply a convenient place to keep track of upcoming changes
+//! that need to be made to AquariWM. It is only temporary and must be removed when the project
+//! nears any kind of stability.
+//!
+//! ## [ICCCM](https://x.org/releases/X11R7.6/doc/xorg-docs/specs/ICCCM/icccm.html) compliance
+//! AquariWM needs to be compliant with the ICCCM. This means placing certain atoms on various
+//! windows and reading certain atoms from various windows to communicate some basic window
+//! manager information with clients. For example, `WM_STATE` should be set on all windows
+//! managed by the window manager.
+//!
+//! ## [EWMH](https://specifications.freedesktop.org/wm-spec/latest) compliance
+//! AquariWM also needs to be compliant with the Extended Window Manager Hints specification. This
+//! is a newer specification for window managers introduced in the early 2000s to build upon the
+//! ICCCM, but does not replace it (both specifications must be adhered to). It is _slightly_ more
+//! involved; for example, the window manager must make its own window, child of root, and set
+//! certain atoms on that window to communicate information about the window manager and to
+//! demonstrate active compliance. The EWMH contains a number of 'higher-level' concepts used in
+//! window managers, such as the concept of 'virtual desktops', also known as 'workspaces', among
+//! other things.
+//!
 //! # Modularity
 //! AquariWM's core feature is its modularity. To understand how it achieves this, you must first
 //! understand the way in which the X Window System works.
@@ -54,9 +75,6 @@ mod aquariwm;
 /// simplify other `use` statements, or, if a feature contains many items that are intended to be
 /// used in other modules, that feature may be exported as its entire module with `pub mod`.
 mod features;
-
-/// This module provides an assortment of utility traits to ease interaction with [xcb].
-pub mod extensions;
 
 /// Contains utilities for sending X requests, especially for queries or initialization on windows.
 pub mod util;

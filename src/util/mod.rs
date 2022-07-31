@@ -2,6 +2,12 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+/// This module provides an assortment of utility traits to ease interaction with [xcb].
+mod extensions;
+
+// Re-export extensions module.
+pub use extensions::*;
+
 use tracing::trace;
 
 use xcb::x::{self, ConfigWindow, Window};
