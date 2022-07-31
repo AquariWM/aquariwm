@@ -35,7 +35,7 @@
 //! With a typical window manager, there is a limit to how much any particular functionality can be
 //! customized without making direct changes to the window manager itself. In contrast, features
 //! can be added or replaced in AquariWM without affecting any other part of the window manager.
-//! Changing the way part of AquariWM works is as simple as launching a different component.
+//! Changing the way part of AquariWM works is as simple as launching a different AquariWM clients.
 
 /// The central module of `aquariwm-server`. Responsible for overseeing AquariWM's state and
 /// operation.
