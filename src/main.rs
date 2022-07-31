@@ -2,29 +2,53 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-//! AquariWM is an extensible, modular window manager for X11.
+//! AquariWM is an ICCCM- and EWMH-compliant window manager for the X Window System. It focuses on
+//! providing a modular approach to window management, allowing different functionality to be
+//! 'mixed and matched' according to a user's wishes. It supports this with a large effort to
+//! provide clear and extensive documentation and guides for users, contributors and clientmakers
+//! alike, and by maintaining a friendly and welcoming community that encourages participation.
 //!
-//! Through its modular approach, AquariWM hopes to allow for in-depth customization and
-//! configuration of the window manager and to make this accessible to as many people as possible.
+//! # Modularity
+//! AquariWM's core feature is its modularity. To understand how it achieves this, you must first
+//! understand the way in which the X Window System works.
 //!
-//! This modularity is achieved through a system of _components_. Each component is a separate
-//! program, an isolated group of functionality that is responsible for a specific part of the
-//! window manager. For example, a configuration component might be the program responsible for
-//! configuring AquariWM to the user's preference. Doing this as a component allows the user to
-//! choose whichever configuration method they prefer, meaning you can use what works best for
-//! you.
+//! ### X Window System
+//! The X window system is centered around a client-server model, as you may be used to using for
+//! the internet. Each graphical application that runs on your computer under X is known as an _X
+//! client_. When your computer is running an _X server_, these clients can communicate with the
+//! server, sending various messages and requests, and receiving various notifications and replies
+//! back.
+//!
+//! A _window manager_ fills a role somewhere in between these two sides: it requests that
+//! certain requests made by clients are redirected to itself, rather than to the X server. A
+//! window manager can send and receive messages to and from X clients, and it can decide which
+//! messages to allow, modify, or deny, before sending its own messages to the X server.
+//!
+//! ### AquariWM clients
+//! In very much a similar way to how X clients communicate with the X server (or any window
+//! manager that may be intercepting these messages), AquariWM allows its modularity by defining
+//! a protocol for X clients to communicate directly with AquariWM. AquariWM's functionality can be
+//! split across multiple 'AquariWM clients', allowing an extreme level of control over how the
+//! window manager operates.
+//!
+//! ## What does this allow AquariWM to do differently?
+//! With a typical window manager, there is a limit to how much any particular functionality can be
+//! customized without making direct changes to the window manager itself. In contrast, features
+//! can be added or replaced in AquariWM without affecting any other part of the window manager.
+//! Changing the way part of AquariWM works is as simple as launching a different component.
 
-/// The central module of AquariWM. Responsible for overseeing AquariWM's state and operation.
+/// The central module of `aquariwm-core`. Responsible for overseeing AquariWM's state and
+/// operation.
 ///
 /// The `aquariwm` module can be thought of as the brain behind AquariWM. It keeps track of the
 /// window manager's state, runs the event loop, and delegates tasks to other modules and
-/// components.
+/// AquariWM clients.
 mod aquariwm;
 
 /// The `features` module contains various other modules for functionality of AquariWM.
 ///
-/// These features are notably _not_ components in their own right, though they may act as bridges
-/// to components that affect their functionality.
+/// These features are notably _not_ AquariWM clients in their own right, though they may act as
+/// bridges to clients that relate to their functionality.
 ///
 /// Features within the `features` module may be re-exported from private modules with `pub use` to
 /// simplify other `use` statements, or, if a feature contains many items that are intended to be

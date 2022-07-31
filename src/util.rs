@@ -12,7 +12,7 @@ use xcb::{Connection, Xid};
 /// This function grabs button press events on the window when the Super key is held (used for
 /// beginning window manipulation) and registers for
 /// [`FOCUS_CHANGE`](xcb::x::EventMask::FOCUS_CHANGE) and
-/// [`ENTER_NOTIFY`](xcb::x::EventMask::ENTER_NOTIFY) events on the window.
+/// [`ENTER_WINDOW`](xcb::x::EventMask::ENTER_WINDOW) events on the window.
 ///
 /// While the grab is only for button _presses_ when the window is initialised, all button motion
 /// and button release events are grabbed once a window manipulation has started and ungrabbed
@@ -81,7 +81,7 @@ pub fn set_dimensions(conn: &Connection, window: Window, dimensions: (u32, u32))
 	});
 }
 
-/// Grabs button presses on the window when the Super key is held.
+/// Grabs button presses on the given window when the Super key is held.
 ///
 /// Used to initiate window manipulations.
 ///
@@ -104,7 +104,7 @@ pub fn init_grabs(conn: &Connection, window: Window) {
 	});
 }
 
-/// Grabs button motion and releases on the root window.
+/// Grabs button motion and releases on the given window.
 ///
 /// Used when a window is being manipulated.
 ///
