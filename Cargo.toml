@@ -3,11 +3,11 @@
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 [package]
-name = "aquariwm"
+name = "aquariwm-server"
 version = "0.1.0"
 authors = [ "AquariWM <contact@aquariwm.org>", "Antikyth <antikyth at gmail dot com>" ]
 edition = "2021"
-description = "A fully modular window manager, extremely extensibile and easily approachable."
+description = "A modular window manager that's approachable."
 readme = true
 homepage = "https://aquariwm.org/"
 repository = "https://github.com/AquariWM/aquariwm"
@@ -21,3 +21,4 @@ categories = [ "config", "gui", "rendering::engine", "window manager" ]
 tracing = "0.1.35"
 tracing-subscriber = "0.3.15"
 xcb = "1.1.1"
+xcb-wm = { version = "0.3.6", features = [ "icccm", "ewmh" ] }

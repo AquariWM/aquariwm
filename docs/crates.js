@@ -1,0 +1,1 @@
+window.ALL_CRATES = ["ansi_term","aquariwm_server","bitflags","cfg_if","lazy_static","libc","log","once_cell","paste","pin_project_lite","proc_macro2","quote","sharded_slab","smallvec","syn","thread_local","tracing","tracing_attributes","tracing_core","tracing_log","tracing_subscriber","unicode_ident","xcb","xcb_wm"];

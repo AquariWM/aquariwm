@@ -1,0 +1,1 @@
+initSidebarItems({"trait":[["ConfigWindowExtensions","Extends [ConfigWindow], allowing easy access to a field’s [ConfigWindowMask]."],["ConfigureRequestEventExtensions","Extends [ConfigureRequestEvent] for easy access to a list of the request’s values."]]});
