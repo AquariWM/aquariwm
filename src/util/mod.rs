@@ -7,10 +7,10 @@ mod extensions;
 
 /// Contains setup and utilities for
 /// [ICCCM](https://x.org/releases/X11R7.6/doc/xorg-docs/specs/ICCCM/icccm.html) compliance.
-mod icccm;
+pub mod icccm;
 /// Contains setup and utilities for
 /// [EWMH](https://specifications.freedesktop.org/wm-spec/latest) compliance.
-mod ewmh;
+pub mod ewmh;
 
 // Re-export extensions module.
 pub use extensions::*;
@@ -32,7 +32,26 @@ use xcb::{Connection, Xid};
 /// when it ends.
 ///
 /// Does not flush the connection.
-pub fn init_window(conn: &Connection, window: Window) {
+pub fn init_window(window: Window, conn: &Connection, icccm_wm_state: x::Atom) {
+	// Set the ICCCM's `WM_STATE` property to `NormalState` when the window is mapped. This is for
+	// ICCCM compliance.
+	conn.send_request(&x::ChangeProperty {
+		mode: x::PropMode::Replace,
+		window,
+		// WM_STATE
+		property: icccm_wm_state,
+		// WM_STATE
+	    r#type: icccm_wm_state,
+		// data[0] = WM_STATE state, one of:
+		//   0  WithdrawnState
+		//   1  NormalState
+		//   2  IconicState
+		//
+		// data[1] = window of the 'icon'... we don't support icons, certainly not yet, so we'll
+		// just set this to NONE.
+	    data: &[1u32, x::WINDOW_NONE.resource_id()],
+	});
+
 	init_grabs(conn, window);
 
 	trace!(
