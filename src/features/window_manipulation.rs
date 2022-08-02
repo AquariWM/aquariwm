@@ -156,6 +156,7 @@ impl WindowManipulation {
 	/// the window if you want this to have an effect.
 	///
 	/// Flushes the connection.
+	#[allow(dead_code)]
 	pub fn cancel(self, conn: &Connection) -> xcb::Result<()> {
 		match self {
 			Self::Moving {

@@ -11,6 +11,7 @@ use xcb_wm::ewmh as e;
 use xcb_wm::icccm as i;
 
 use crate::features::WindowManipulation;
+use crate::features::Atoms;
 use crate::util::{self, ConfigureRequestEventExtensions};
 
 /// The central object of the entire AquariWM window manager. Contains state and the event loop.
@@ -19,7 +20,7 @@ pub struct AquariWm<'a> {
 	conn: &'a Connection,
 	icccm_conn: i::Connection<'a>,
 	ewmh_conn: e::Connection<'a>,
-	icccm_wm_state: x::Atom,
+	atoms: Atoms,
 	/// Represents the ongoing manipulation of a window, if one is occurring.
 	///
 	/// [`None`] here means that there is no window being manipulated.
@@ -28,12 +29,12 @@ pub struct AquariWm<'a> {
 
 impl<'a> AquariWm<'a> {
 	/// Starts the window manager by instantiating `Self` and running the event loop.
-	pub fn start(icccm_conn: i::Connection<'a>, ewmh_conn: e::Connection<'a>, conn: &'a Connection, icccm_wm_state: x::Atom) -> xcb::Result<()> {
+	pub fn start(atoms: Atoms, icccm_conn: i::Connection<'a>, ewmh_conn: e::Connection<'a>, conn: &'a Connection) -> xcb::Result<()> {
 		let wm = Self {
 			icccm_conn,
 			ewmh_conn,
 			conn,
-			icccm_wm_state,
+			atoms,
 			manipulation: None,
 		};
 
@@ -71,7 +72,7 @@ impl<'a> AquariWm<'a> {
 						window = window.resource_id(),
 						"Setting up newly mapped window"
 					);
-					util::init_window(window, self.conn, self.icccm_wm_state);
+					util::init_window(window, self.conn, self.atoms.wm_state);
 					self.conn.flush()?;
 				}
 				// Start window manipulation if no other window manipulation is already happening.

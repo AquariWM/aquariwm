@@ -13,22 +13,19 @@
 //! that need to be made to AquariWM. It is only temporary and must be removed when the project
 //! nears any kind of stability.
 //!
+//! - Move `run` events to their own functions
+//! - Make `Atoms` actually nice, e.g. docs and such
+//!
 //! ## [ICCCM](https://x.org/releases/X11R7.6/doc/xorg-docs/specs/ICCCM/icccm.html) compliance
 //! AquariWM needs to be compliant with the ICCCM. This means placing certain atoms on various
 //! windows and reading certain atoms from various windows to communicate some basic window
 //! manager information with clients. For example, `WM_STATE` should be set on all windows
 //! managed by the window manager.
 //!
-//! ### `WM_STATE`
-//! AquariWM needs to set the `WM_STATE` property on all windows as they are mapped.
-//!
-//! This should be set on all windows and whenever a window is mapped by the window manager.
-//!
 //! ### `WM_HINTS`
 //! AquariWM needs to read and interpret the `WM_HINTS` property if it is set on windows. This
 //! property, naturally, gives the window manager hints about certain ways it would like to be
-//! managed. In particular, the 'preferred initial state' of the window when mapped may be hinted
-//! by the client.
+//! managed.
 //!
 //! ## [EWMH](https://specifications.freedesktop.org/wm-spec/latest) compliance
 //! AquariWM also needs to be compliant with the Extended Window Manager Hints specification. This
@@ -175,7 +172,7 @@ fn main() -> xcb::Result<()> {
 
 	let (conn, screen_id) = Connection::connect(None)?;
 
-	let (icccm_conn, icccm_wm_state) = icccm::init(&conn).unwrap();
+	let (icccm_conn, atoms) = icccm::init(&conn).unwrap();
 	let ewmh_conn = e::Connection::connect(&conn);
 	debug!(screen = screen_id, "Established connection to the X server");
 
@@ -241,7 +238,7 @@ fn main() -> xcb::Result<()> {
 		.zip(windows)
 		.for_each(|(reply, window)| {
 			if reply.is_ok() && reply.unwrap().map_state() == x::MapState::Viewable {
-				util::init_window(*window, &conn, icccm_wm_state);
+				util::init_window(*window, &conn, atoms.wm_state);
 			}
 		});
 
@@ -253,6 +250,6 @@ fn main() -> xcb::Result<()> {
 
 	// It is now time to finalize the initialization of AquariWM by instantiating the main window
 	// manager.
-	AquariWm::start(icccm_conn, ewmh_conn, &conn, icccm_wm_state)?;
+	AquariWm::start(atoms, icccm_conn, ewmh_conn, &conn)?;
 	Ok(())
 }
