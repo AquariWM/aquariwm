@@ -1,1 +1,0 @@
-initSidebarItems({"struct":[["AquariWm","The central object of the entire AquariWM window manager. Contains state and the event loop."]]});

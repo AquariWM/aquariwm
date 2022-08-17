@@ -4,28 +4,40 @@
 
 use tracing::{debug, info, trace};
 
-use xcb::{x, Connection, Xid};
+use xcb::{x, Xid};
 
-use crate::extensions::ConfigureRequestEventExtensions;
+use xcb::Connection;
+use xcb_wm::ewmh as e;
+use xcb_wm::icccm as i;
+
 use crate::features::WindowManipulation;
-use crate::util;
+use crate::features::Atoms;
+use crate::util::{self, ConfigureRequestEventExtensions};
 
 /// The central object of the entire AquariWM window manager. Contains state and the event loop.
-pub struct AquariWm {
-	conn: Connection,
+#[allow(dead_code)]
+pub struct AquariWm<'a> {
+	conn: &'a Connection,
+	icccm_conn: i::Connection<'a>,
+	ewmh_conn: e::Connection<'a>,
+	atoms: Atoms,
 	/// Represents the ongoing manipulation of a window, if one is occurring.
 	///
 	/// [`None`] here means that there is no window being manipulated.
 	manipulation: Option<WindowManipulation>,
 }
 
-impl AquariWm {
+impl<'a> AquariWm<'a> {
 	/// Starts the window manager by instantiating `Self` and running the event loop.
-	pub fn start(conn: Connection) -> xcb::Result<()> {
+	pub fn start(atoms: Atoms, icccm_conn: i::Connection<'a>, ewmh_conn: e::Connection<'a>, conn: &'a Connection) -> xcb::Result<()> {
 		let wm = Self {
+			icccm_conn,
+			ewmh_conn,
 			conn,
+			atoms,
 			manipulation: None,
 		};
+
 		wm.run()
 	}
 
@@ -60,7 +72,7 @@ impl AquariWm {
 						window = window.resource_id(),
 						"Setting up newly mapped window"
 					);
-					util::init_window(&self.conn, window);
+					util::init_window(window, self.conn, self.atoms.wm_state);
 					self.conn.flush()?;
 				}
 				// Start window manipulation if no other window manipulation is already happening.
@@ -74,9 +86,9 @@ impl AquariWm {
 						// manipulation, start moving the window.
 						if notif.detail() == x::ButtonIndex::N1 as u8 {
 							self.manipulation =
-								Some(WindowManipulation::moving(&self.conn, window, cursor_pos)?);
+								Some(WindowManipulation::moving(self.conn, window, cursor_pos)?);
 
-							util::grab_manip_buttons(&self.conn, window);
+							util::grab_manip_buttons(self.conn, window);
 							self.conn.flush()?;
 						}
 
@@ -84,10 +96,10 @@ impl AquariWm {
 						// window manipulation, start resizing the window.
 						if notif.detail() == x::ButtonIndex::N3 as u8 {
 							self.manipulation = Some(WindowManipulation::resizing(
-								&self.conn, window, cursor_pos,
+								self.conn, window, cursor_pos,
 							)?);
 
-							util::grab_manip_buttons(&self.conn, window);
+							util::grab_manip_buttons(self.conn, window);
 							self.conn.flush()?;
 						}
 					}
@@ -119,7 +131,7 @@ impl AquariWm {
 								button: x::ButtonIndex::Any,
 								modifiers: x::ModMask::ANY,
 							});
-							util::init_grabs(&self.conn, manipulation.window());
+							util::init_grabs(self.conn, manipulation.window());
 
 							self.manipulation = None;
 						}
@@ -134,7 +146,7 @@ impl AquariWm {
 					if self.manipulation.is_some() {
 						self.manipulation
 							.unwrap()
-							.apply(&self.conn, (notif.root_x(), notif.root_y()))?;
+							.apply(self.conn, (notif.root_x(), notif.root_y()))?;
 					}
 				}
 				// Focus whatever window the cursor enters.

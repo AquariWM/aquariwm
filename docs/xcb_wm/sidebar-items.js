@@ -1,1 +1,0 @@
-initSidebarItems({"mod":[["ewmh","see: https://specifications.freedesktop.org/wm-spec/1.5/ar01s03.html#idm45539547193552"],["icccm","Request and response definitions for the icccm protocol"]]});

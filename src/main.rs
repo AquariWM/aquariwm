@@ -8,6 +8,93 @@
 //! provide clear and extensive documentation and guides for users, contributors and clientmakers
 //! alike, and by maintaining a friendly and welcoming community that encourages participation.
 //!
+//! # TODO
+//! To-do list follows. This section is simply a convenient place to keep track of upcoming changes
+//! that need to be made to AquariWM. It is only temporary and must be removed when the project
+//! nears any kind of stability.
+//!
+//! - Move `run` events to their own functions
+//! - Make `Atoms` actually nice, e.g. docs and such
+//!
+//! ## [ICCCM](https://x.org/releases/X11R7.6/doc/xorg-docs/specs/ICCCM/icccm.html) compliance
+//! AquariWM needs to be compliant with the ICCCM. This means placing certain atoms on various
+//! windows and reading certain atoms from various windows to communicate some basic window
+//! manager information with clients. For example, `WM_STATE` should be set on all windows
+//! managed by the window manager.
+//!
+//! ### `WM_HINTS`
+//! AquariWM needs to read and interpret the `WM_HINTS` property if it is set on windows. This
+//! property, naturally, gives the window manager hints about certain ways it would like to be
+//! managed.
+//!
+//! ## [EWMH](https://specifications.freedesktop.org/wm-spec/latest) compliance
+//! AquariWM also needs to be compliant with the Extended Window Manager Hints specification. This
+//! is a newer specification for window managers introduced in the early 2000s to build upon the
+//! ICCCM, but does not replace it (both specifications must be adhered to). It is _slightly_ more
+//! involved; for example, the window manager must make its own window, child of root, and set
+//! certain atoms on that window to communicate information about the window manager and to
+//! demonstrate active compliance. The EWMH contains a number of 'higher-level' concepts used in
+//! window managers, such as the concept of 'virtual desktops', also known as 'workspaces', among
+//! other things.
+//!
+//! ### `_NET_SUPPORTED`
+//! AquariWM needs to set the `_NET_SUPPORTED` property to a list of the atoms associated with
+//! every supported hint. Hints are the 'messages' that clients  can leave the window manager on
+//! their windows to inform the window manager on how to handle the window. For example,
+//! `_NET_WM_STATE`, `_NET_WM_STATE_MODAL`, `_NET_WM_STATE_STICKY` would _all_ be listed.
+//!
+//! This should be set on the root window.
+//!
+//! ### `_NET_CLIENT_LIST`
+//! AquariWM shall maintain a list of all windows managed by the window manager, in order of the
+//! time which they were first mapped (from oldest to newest). This list shall be updated in the
+//! `_NET_CLIENT_LIST` property.
+//!
+//! This should be set on the root window.
+//!
+//! ### `_NET_DESKTOP_VIEWPORT`
+//! This property must be set to `0, 0` by AquariWM. It represents the portion of a 'large
+//! desktop' that is currently shown by the window manager... whatever a large desktop is. Window
+//! managers that don't support 'large desktops' should apparently just set it to `0, 0`.
+//!
+//! This should be set on the root window.
+//!
+//! ### `_NET_CURRENT_DESKTOP`
+//! This property must be set by AquariWM to the index of the current desktop. As AquariWM does not
+//! yet support desktops, we should set this to `0`.
+//!
+//! This should be set on the root window.
+//!
+//! ### `_NET_ACTIVE_WINDOW`
+//! This is a property that needs to be set by AquariWM to the ID of the currently focused window.
+//! Whenever a window is focused, this should be updated.
+//!
+//! This should be set on the root window.
+//!
+//! ### `_NET_WORKAREA`
+//! This property contains the area of the desktop that is to be used by windows; this should be
+//! the viewport minus docks and such. AquariWM must set this, so, for now, it should just set it
+//! to the full viewport.
+//!
+//! This should be set on the root window.
+//!
+//! ### `_NET_CLOSE_WINDOW`
+//! This is an event that can be received by AquariWM and must be fulfilled. It is sent to the root
+//! window, and specifies a window that must be closed by the window manager.
+//!
+//! ### `_NET_WM_MOVERESIZE`
+//! This is an event sent to AquariWM from clients that requests the start of window manipulation
+//! for the particular client.
+//!
+//! ### `_NET_REQUEST_FRAME_EXTENTS`
+//! This is quite a complicated event to implement... it represents a request from a client for the
+//! window manager to provide an estimate for what its position and dimensions will be (after
+//! decoration) after mapping. It requires that a `_WMMC_LAYOUT` client 'virtually' place the
+//! window to determine the position and size of its frame, and then for a `_WMMC_DECORATE` client
+//! to calculate and return the area that will be taken up by the window's frame. Finally, AquariWM
+//! can provide an estimate for the position and dimensions that will be allocated to the
+//! requesting client.
+//!
 //! # Modularity
 //! AquariWM's core feature is its modularity. To understand how it achieves this, you must first
 //! understand the way in which the X Window System works.
@@ -35,7 +122,7 @@
 //! With a typical window manager, there is a limit to how much any particular functionality can be
 //! customized without making direct changes to the window manager itself. In contrast, features
 //! can be added or replaced in AquariWM without affecting any other part of the window manager.
-//! Changing the way part of AquariWM works is as simple as launching a different component.
+//! Changing the way part of AquariWM works is as simple as launching a different AquariWM clients.
 
 /// The central module of `aquariwm-server`. Responsible for overseeing AquariWM's state and
 /// operation.
@@ -55,9 +142,6 @@ mod aquariwm;
 /// used in other modules, that feature may be exported as its entire module with `pub mod`.
 mod features;
 
-/// This module provides an assortment of utility traits to ease interaction with [xcb].
-pub mod extensions;
-
 /// Contains utilities for sending X requests, especially for queries or initialization on windows.
 pub mod util;
 
@@ -66,7 +150,12 @@ use tracing::{debug, info, trace};
 use xcb::x;
 use xcb::{Connection, Xid};
 
+use xcb_wm::ewmh as e;
+
+use crate::util::icccm;
 use crate::aquariwm::AquariWm;
+
+const NAME: &str = "AquariWM";
 
 /// The main entrypoint for AquariWM; `main` is responsible for initalization/setup.
 fn main() -> xcb::Result<()> {
@@ -82,7 +171,10 @@ fn main() -> xcb::Result<()> {
 	info!("Starting AquariWM");
 
 	let (conn, screen_id) = Connection::connect(None)?;
-	debug!(screen = screen_id, "Established connection to the X server",);
+
+	let (icccm_conn, atoms) = icccm::init(&conn).unwrap();
+	let ewmh_conn = e::Connection::connect(&conn);
+	debug!(screen = screen_id, "Established connection to the X server");
 
 	let root = conn
 		.get_setup()
@@ -90,6 +182,7 @@ fn main() -> xcb::Result<()> {
 		.nth(screen_id as usize)
 		.unwrap()
 		.root();
+
 
 	// Send a request for substructure redirection on the root window (required for the window
 	// manager to function, only one client can have substructure redirection at once).
@@ -145,7 +238,7 @@ fn main() -> xcb::Result<()> {
 		.zip(windows)
 		.for_each(|(reply, window)| {
 			if reply.is_ok() && reply.unwrap().map_state() == x::MapState::Viewable {
-				util::init_window(&conn, *window);
+				util::init_window(*window, &conn, atoms.wm_state);
 			}
 		});
 
@@ -157,6 +250,6 @@ fn main() -> xcb::Result<()> {
 
 	// It is now time to finalize the initialization of AquariWM by instantiating the main window
 	// manager.
-	AquariWm::start(conn)?;
+	AquariWm::start(atoms, icccm_conn, ewmh_conn, &conn)?;
 	Ok(())
 }

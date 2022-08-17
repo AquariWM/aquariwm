@@ -1,1 +1,0 @@
-initSidebarItems({"mod":[["desktops","TODO: Stub"],["window_manipulation","Keeps track of the manipulation of a window. See the WindowManipulation enum for more information."]]});
