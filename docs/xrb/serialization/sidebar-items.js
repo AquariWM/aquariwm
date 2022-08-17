@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["read_value",""],["write_value",""]],"trait":[["Deserialize","Deserializes a data structure from bytes. Values should implement [`ReadValue`] instead."],["Serialize","Serializes a data structure to bytes. Values should implement [`WriteValue`] instead."]]});

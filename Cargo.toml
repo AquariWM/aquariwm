@@ -22,3 +22,4 @@ tracing = "0.1.35"
 tracing-subscriber = "0.3.15"
 xcb = "1.1.1"
 xcb-wm = { version = "0.3.6", features = [ "icccm", "ewmh" ] }
+xrb = { path = "../xrb" }
