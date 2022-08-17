@@ -1,0 +1,4 @@
+var sourcesIndex = {};
+sourcesIndex["bytes"] = {"name":"","dirs":[{"name":"buf","files":["buf_impl.rs","buf_mut.rs","chain.rs","iter.rs","limit.rs","mod.rs","reader.rs","take.rs","uninit_slice.rs","vec_deque.rs","writer.rs"]},{"name":"fmt","files":["debug.rs","hex.rs","mod.rs"]}],"files":["bytes.rs","bytes_mut.rs","lib.rs","loom.rs"]};
+sourcesIndex["xrb"] = {"name":"","dirs":[{"name":"macros","files":["_request_schema.rs","bitmask.rs","error.rs","event.rs","mod.rs","predefine.rs","reply.rs","request.rs"]},{"name":"proto","dirs":[{"name":"messages","dirs":[{"name":"requests","files":["mod.rs"]}],"files":["errors.rs","events.rs","mod.rs","replies.rs"]}],"files":["atoms.rs","bitmasks.rs","common.rs","ids.rs","mod.rs"]},{"name":"serialization","files":["mod.rs","read_value.rs","write_value.rs"]}],"files":["error_handling.rs","lib.rs"]};
+createSourceSidebar();
