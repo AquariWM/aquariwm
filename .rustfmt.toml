@@ -2,11 +2,19 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-# This configures ˋrustfmtˋ (typically accessed via ˋcargo fmtˋ) to format Rust
-# code to use hard tab characters for indentation, rather than spaces.
-#
-# If you would like to learn more about why this is preferred in AquariWM, or
-# you would like to discuss the decision, please check out the pinned
-# discussion about hard tabs that can be found under the 'Discussions' tab of
-# the AquariWM project's GitHub repository (AquariWM/aquariwm).
 hard_tabs = true
+combine_control_expr = false
+wrap_comments = true
+comment_width = 100
+max_width = 120
+condense_wildcard_suffixes = true
+fn_args_layout = "Compressed"
+format_strings = true
+imports_layout = "HorizontalVertical"
+match_block_trailing_comma = true
+imports_granularity = "Crate"
+normalize_comments = true
+normalize_doc_attributes = true
+unstable_features = true
+use_field_init_shorthand = true
+use_try_shorthand = true

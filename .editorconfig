@@ -7,81 +7,14 @@
 # should use when editing a particular project. This is useful so that a style guide can be
 # maintained throughout the project.
 
-# AquariWM uses the Rust programming language's code style guidelines throughout the project, with
-# the following exceptions:
-# - 'Hard' tab characters must be used for indentation, NOT spaces. Spaces, however, should be
-#   used for the alignment of text, like in comments, for example.
-# - If a language other than Rust is being programmed in, and that language has its own code style
-#   guidelines, then those code style guidelines should be applied first. Any code style
-#   guidelines from Rust that do not contridict the guidelines of the specific language being used
-#   should also apply.
-# - If another language than Rust is being used, then these exceptions still apply. That means all
-#   languages where it is _possible_ to use hard tab characters instead of spaces should have hard
-#   tab characters applied, for example.
-#
-# You can learn more about the code style guidelines used in AquariWM in the contributors' section
-# of the AquariWM wiki, which you can find on its GitHub repository 'AquariWM/aquariwm'.
-
 # This declares that this is the .editorconfig file for the whole project, i.e. the root.
 root = true
 
-# This configures editors to use hard tab characters for indentation, rather than spaces. The
-# reasoning for this choice can be found and discussed in the pinned discussion regarding hard tab
-# indentation in the AquariWM project's GitHub repository under the 'Discussions' tab.
+[*]
 indent_style = tab
 indent_size = 4
-
-# While this is not part of Rust's official style guide, AquariWM is a project that primarily
-# caters to Linux-based operating systems and users who will be contributing from such Linux-based
-# operating systems. For this reason, the line endings used on Linux are the preferred line endings
-# for the AquariWM project.
 end_of_line = lf
-
-# To ensure AquariWM is accessible to speakers of other languages, among other reasons, Unicode
-# file encoding is required for files within the AquariWM project. Specifically, UTF-8 is
-# specified.
 charset = utf-8
-
-# As per Rust's official style guide, trailing whitespace shall be trimmed from the end of lines.
 trim_trailing_whitespace = true
-
-# As per Rust's official style guide, trailing lines shall be trimmed from the end of files.
-insert_final_newline = false
-
-# While supported by a limited number of editors, a maximum line length of 100 characters shall be
-# enforced throughout the AquariWM project, in accordance with Rust's official style guide.
-#
-# This feature is supported by the following editors:
-#   Emacs
-#   Vim
-#   Atom
-#   ReSharper
-#   Rider
-#   AppCode
-#   IntelliJ IDEA
-#   PhpStorm
-#   PyCharm
-#   RubyMine
-#   WebStorm
-#   Kakoune
-#   Prettier
-#
-# Users of other text editors should manually configure or enforce this maximum line length
-# themselves.
-max_line_length = 100
-
-### The following options are not supported by EditorConfig, but are popular proposals. We have ###
-### included them on the offchance that support may be implemented for them by editors in the   ###
-### future.                                                                                     ###
-
-# Double quotes are preferred (", not ')
-quote_type = double
-
-# Curly brackets shall remain on the same line.
-curly_bracket_next_line = false
-
-# Spaces shall be included around operators.
-spaces_around_operators = true
-
-# Spaces shall be added around single-line blocks of code on the inside of brackets.
-spaces_around_brackets = inside
+insert_final_newline = true
+max_line_length = 120
