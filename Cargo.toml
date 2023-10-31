@@ -5,7 +5,7 @@
 [package]
 name = "aquariwm"
 version = "0.1.0"
-authors = [ "AquariWM", "Antikyth" ]
+authors = ["AquariWM", "Antikyth"]
 edition = "2021"
 readme = true
 homepage = "https://aquariwm.org/"
@@ -15,5 +15,12 @@ license = "MPL-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-smithay = "0.3.0"
 bitflags = "2.2.1"
+thiserror = "1.0.50"
+
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
+
+[dependencies.smithay]
+git = "https://github.com/Smithay/smithay.git"
+features = ["backend_winit", "wayland_frontend", "desktop"]
