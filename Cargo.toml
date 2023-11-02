@@ -19,9 +19,11 @@ license = "MPL-2.0"
 default = ["wayland", "x11", "testing"]
 
 wayland = ["dep:smithay"]
-x11 = []
+x11 = ["dep:xcb", "winit?/x11"]
 
-testing = ["smithay?/backend_winit"]
+# NOTE: winit is provided even if x11 is not enabled, because there is no way to specify that two
+#       features must be enabled for an optional dependency.
+testing = ["smithay?/backend_winit", "dep:winit"]
 
 [dependencies]
 bitflags = "2.2.1"
@@ -33,7 +35,14 @@ clap_complete = "4.4.4"
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 
-xcb = "1.2.2"
+[dependencies.xcb]
+version = "1.2.2"
+optional = true
+
+[dependencies.winit]
+version = "0.29.3"
+default-features = false
+optional = true
 
 [dependencies.smithay]
 git = "https://github.com/Smithay/smithay.git"

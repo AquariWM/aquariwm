@@ -2,12 +2,14 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use std::{env, io, process, process::Command, thread, time::Duration};
+use std::{env, io, thread};
 
 use tracing::{event, span, Level};
 use xcb::x::{self as x11, Circulate, Cw as Attribute, EventMask, Place};
 
 mod util;
+
+pub const NAME: &str = "AquariWM (X11)";
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -34,6 +36,15 @@ pub type Result<T, Err = Error> = std::result::Result<T, Err>;
 
 #[cfg(feature = "testing")]
 mod testing {
+	use std::{process, sync::mpsc, time::Duration};
+
+	use winit::{
+		event::{Event as WinitEvent, WindowEvent as WinitWindowEvent},
+		event_loop::EventLoopBuilder as WinitEventLoopBuilder,
+		platform::x11::EventLoopBuilderExtX11,
+		window::WindowBuilder as WinitWindowBuilder,
+	};
+
 	use super::*;
 
 	pub struct Xephyr(pub process::Child);
@@ -50,21 +61,53 @@ mod testing {
 		pub fn spawn() -> io::Result<Self> {
 			const TESTING_DISPLAY: &str = ":1";
 
-			match Command::new("Xephyr").arg("-resizeable").arg(TESTING_DISPLAY).spawn() {
-				Ok(process) => {
-					event!(Level::DEBUG, "Initialised Xephyr");
+			let (transmitter, receiver) = mpsc::channel();
 
+			// Create and run a `winit` window for `Xephyr` to use in another thread so it doesn't block the
+			// main thread.
+			thread::spawn(move || {
+				event!(Level::DEBUG, "Initialising winit window");
+
+				let event_loop = WinitEventLoopBuilder::new().with_any_thread(true).build().unwrap();
+				let window = WinitWindowBuilder::new().with_title(NAME).build(&event_loop).unwrap();
+
+				// Send the window's window ID back to the main thread so it can be supplied to `Xephyr`.
+				transmitter.send(u64::from(window.id())).unwrap();
+
+				event_loop
+					.run(move |event, target| match event {
+						// Close the window if requested.
+						WinitEvent::WindowEvent {
+							event: WinitWindowEvent::CloseRequested,
+							..
+						} => target.exit(),
+
+						_ => (),
+					})
+					.unwrap();
+			});
+			let window_id = receiver.recv().unwrap();
+
+			event!(Level::DEBUG, "Initialising Xephyr");
+			match process::Command::new("Xephyr")
+				.arg("-resizeable")
+				// Run `Xephyr` in the `winit` window.
+				.args(["-parent", &window_id.to_string()])
+				.arg(TESTING_DISPLAY)
+				.spawn()
+			{
+				Ok(process) => {
 					// Set the `DISPLAY` env variable to `TESTING_DISPLAY`.
 					env::set_var("DISPLAY", TESTING_DISPLAY);
 
-					// Sleep for 3s to wait for Xephyr to launch. Not ideal.
-					thread::sleep(Duration::from_secs(3));
+					// Sleep for 1s to wait for Xephyr to launch. Not ideal.
+					thread::sleep(Duration::from_secs(1));
 
 					Ok(Self(process))
 				},
 
 				Err(error) => {
-					event!(Level::ERROR, "Failed to initialise Xephyr: {error}");
+					event!(Level::ERROR, "Error while attempting to initialise Xephyr: {error}");
 
 					Err(error)
 				},
@@ -86,7 +129,7 @@ mod testing {
 }
 
 pub fn run(testing: bool) -> Result<()> {
-	let init_span = span!(Level::INFO, "Initialising AquariWM (X11)").entered();
+	let init_span = span!(Level::INFO, "Initialisation").entered();
 
 	if testing {
 		event!(Level::INFO, "Testing mode enabled");
