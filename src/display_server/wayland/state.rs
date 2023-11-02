@@ -152,6 +152,7 @@ impl XdgShellHandler for AquariWm {
 				initial_window_location,
 			};
 
+			// False negative in RustRover/IntelliJ Rust plugin here.
 			pointer.set_grab(self, grab, serial, pointer::Focus::Clear);
 		}
 	}
@@ -189,6 +190,7 @@ impl XdgShellHandler for AquariWm {
 				Rectangle::from_loc_and_size(initial_window_location, initial_window_size),
 			);
 
+			// False negative in RustRover/IntelliJ Rust plugin here.
 			pointer.set_grab(self, grab, serial, pointer::Focus::Clear);
 		}
 	}

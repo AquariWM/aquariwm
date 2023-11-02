@@ -19,7 +19,7 @@ use smithay::{
 	utils::SERIAL_COUNTER,
 };
 
-use crate::wayland::state;
+use super::state;
 
 impl state::AquariWm {
 	pub fn process_input_event<Backend: InputBackend>(&mut self, event: InputEvent<Backend>) {

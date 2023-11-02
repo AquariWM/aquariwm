@@ -14,13 +14,28 @@ license = "MPL-2.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+# TODO: When compiling for release, maybe don't include the testing feature?
+default = ["wayland", "x11", "testing"]
+
+wayland = ["dep:smithay"]
+x11 = []
+
+testing = ["smithay?/backend_winit"]
+
 [dependencies]
 bitflags = "2.2.1"
 thiserror = "1.0.50"
 
+clap = { version = "4.4.7", features = ["derive"] }
+clap_complete = "4.4.4"
+
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 
+xcb = "1.2.2"
+
 [dependencies.smithay]
 git = "https://github.com/Smithay/smithay.git"
-features = ["backend_winit", "wayland_frontend", "desktop"]
+features = ["wayland_frontend", "desktop"]
+optional = true

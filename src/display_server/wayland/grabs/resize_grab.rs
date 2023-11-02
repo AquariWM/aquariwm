@@ -28,8 +28,7 @@ use smithay::{
 };
 use tracing::{event, span, Level};
 
-use super::PRIMARY_BUTTON;
-use crate::wayland::state;
+use super::{super::state, PRIMARY_BUTTON};
 
 type Rectangle<N = i32, Space = LogicalSpace> = smithay::utils::Rectangle<N, Space>;
 type Size<N = i32, Space = LogicalSpace> = smithay::utils::Size<N, Space>;

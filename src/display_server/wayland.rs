@@ -2,14 +2,17 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use std::{env, process::Command, time::Duration};
+use std::{any::Any, env, time::Duration};
 
+#[cfg(feature = "testing")]
+use smithay::backend::winit::{self, WinitEvent};
 use smithay::{
-	backend::{
-		renderer::{damage::OutputDamageTracker, element::surface::WaylandSurfaceRenderElement, gles::GlesRenderer},
-		winit::{self, WinitEvent, WinitEventLoop},
+	backend::renderer::{
+		damage::OutputDamageTracker,
+		element::surface::WaylandSurfaceRenderElement,
+		gles::GlesRenderer,
 	},
-	desktop::space,
+	desktop::space::render_output,
 	output::{self, Output, PhysicalProperties, Subpixel},
 	reexports::{
 		calloop,
@@ -18,7 +21,6 @@ use smithay::{
 	},
 	utils::{Rectangle, Transform},
 };
-use space::render_output;
 use thiserror::Error;
 use tracing::{event, span, Level};
 
@@ -34,43 +36,35 @@ pub const REFRESH_RATE: i32 = FPS * MS_PER_SECOND;
 pub const REFRESH_DELAY: u64 = (MS_PER_SECOND / FPS) as u64;
 
 #[derive(Debug, Error)]
-pub enum Error<CalloopInsertSource = ()> {
+pub enum Error {
 	#[error(transparent)]
 	Calloop(#[from] calloop::Error),
 	#[error(transparent)]
-	CalloopInsert(#[from] calloop::InsertError<CalloopInsertSource>),
+	CalloopInsert(#[from] calloop::InsertError<Box<dyn Any>>),
 
 	#[error(transparent)]
 	WaylandInit(#[from] InitError),
 
+	#[cfg(feature = "testing")]
 	#[error(transparent)]
 	Winit(#[from] winit::Error),
 }
 
-pub fn run() -> Result<(), Error<WinitEventLoop>> {
+pub fn run() -> Result<(), Error> {
 	// Log initialisation.
 	let init_span = span!(Level::INFO, "Initialising AquariWM (Wayland)").entered();
-
-	if let Ok(env_filter) = tracing_subscriber::EnvFilter::try_from_default_env() {
-		tracing_subscriber::fmt().with_env_filter(env_filter).init();
-	} else {
-		tracing_subscriber::fmt().init();
-	}
 
 	// Create an event loop for the compositor to run with.
 	let mut event_loop = <EventLoop<state::AquariWm>>::try_new()?;
 	// Initialise the AquariWM state.
 	let mut state = state::AquariWm::new(Display::new()?, &mut event_loop);
 
+	// Init winit for testing if the testing feature is enabled.
+	#[cfg(feature = "testing")]
 	init_winit(&mut event_loop, &mut state)?;
 
-	if let Some(terminal) = env::var_os("TERM") {
-		match Command::new(&terminal).spawn() {
-			Ok(_) => event!(Level::INFO, "Launched {terminal:?}"),
-
-			Err(error) => event!(Level::WARN, "Failed to launch {terminal:?}: {error}"),
-		}
-	}
+	// Attempt to launch a terminal.
+	crate::launch_terminal();
 
 	// End the initialisation span.
 	init_span.exit();
@@ -80,10 +74,8 @@ pub fn run() -> Result<(), Error<WinitEventLoop>> {
 	Ok(())
 }
 
-pub fn init_winit(
-	event_loop: &mut EventLoop<state::AquariWm>,
-	state: &mut state::AquariWm,
-) -> Result<(), Error<WinitEventLoop>> {
+#[cfg(feature = "testing")]
+pub fn init_winit(event_loop: &mut EventLoop<state::AquariWm>, state: &mut state::AquariWm) -> Result<(), Error> {
 	let _span = span!(Level::DEBUG, "Initialising winit").entered();
 
 	// Initialise winit.
@@ -133,76 +125,83 @@ pub fn init_winit(
 
 	let mut damage_tracker = OutputDamageTracker::from_output(&output);
 
+	// Set the `WAYLAND_DISPLAY` for the window manager to use to the socket name.
 	env::set_var("WAYLAND_DISPLAY", &state.socket_name);
 
-	event_loop.handle().insert_source(winit, move |event, _, state| {
-		let state::AquariWm {
-			display_handle,
-			popup_manager,
-			space,
-			start_time,
-			loop_signal,
-			..
-		} = state;
+	event_loop
+		.handle()
+		.insert_source(winit, move |event, _, state| {
+			let state::AquariWm {
+				display_handle,
+				popup_manager,
+				space,
+				start_time,
+				loop_signal,
+				..
+			} = state;
 
-		match event {
-			WinitEvent::Resized { size, .. } => {
-				output.change_current_state(
-					Some(output::Mode {
-						size,
-						refresh: REFRESH_RATE,
-					}),
-					None,
-					None,
-					None,
-				);
-			},
+			match event {
+				WinitEvent::Resized { size, .. } => {
+					output.change_current_state(
+						Some(output::Mode {
+							size,
+							refresh: REFRESH_RATE,
+						}),
+						None,
+						None,
+						None,
+					);
+				},
 
-			WinitEvent::Input(event) => state.process_input_event(event),
+				WinitEvent::Input(event) => state.process_input_event(event),
 
-			WinitEvent::Redraw => {
-				let size = backend.window_size();
-				let damage = Rectangle::from_loc_and_size((0, 0), size);
+				WinitEvent::Redraw => {
+					let size = backend.window_size();
+					let damage = Rectangle::from_loc_and_size((0, 0), size);
 
-				backend.bind().unwrap();
+					backend.bind().unwrap();
 
-				// RustRover has a false negative here, I filed a report at:
-				// https://youtrack.jetbrains.com/issue/RUST-12497/False-negative-for-E0107-wrong-number-of-type-arguments-when-some-type-arguments-are-feature-flag-gated
-				// To be fair, this is an absolutely unhinged function signature.
-				render_output::<_, WaylandSurfaceRenderElement<GlesRenderer>, _, _>(
-					&output,
-					backend.renderer(),
-					1.0,
-					0,
-					[&*space],
-					&[],
-					&mut damage_tracker,
-					[0.1, 0.1, 0.1, 0.1],
-				)
-				.unwrap();
-				backend.submit(Some(&[damage])).unwrap();
+					// RustRover has a false negative here, I filed a report at:
+					// https://youtrack.jetbrains.com/issue/RUST-12497/False-negative-for-E0107-wrong-number-of-type-arguments-when-some-type-arguments-are-feature-flag-gated
+					// To be fair, this is an absolutely unhinged function signature.
+					render_output::<_, WaylandSurfaceRenderElement<GlesRenderer>, _, _>(
+						&output,
+						backend.renderer(),
+						1.0,
+						0,
+						[&*space],
+						&[],
+						&mut damage_tracker,
+						[0.1, 0.1, 0.1, 0.1],
+					)
+					.unwrap();
+					backend.submit(Some(&[damage])).unwrap();
 
-				for window in space.elements() {
-					window.send_frame(&output, start_time.elapsed(), Some(Duration::ZERO), |_, _| {
-						Some(output.clone())
-					});
-				}
+					for window in space.elements() {
+						window.send_frame(&output, start_time.elapsed(), Some(Duration::ZERO), |_, _| {
+							Some(output.clone())
+						});
+					}
 
-				space.refresh();
-				popup_manager.cleanup();
-				let _ = display_handle.flush_clients();
+					space.refresh();
+					popup_manager.cleanup();
+					let _ = display_handle.flush_clients();
 
-				// Ask for a redraw to schedule a new frame.
-				backend.window().request_redraw();
-			},
+					// Ask for a redraw to schedule a new frame.
+					backend.window().request_redraw();
+				},
 
-			WinitEvent::CloseRequested => {
-				loop_signal.stop();
-			},
+				WinitEvent::CloseRequested => {
+					loop_signal.stop();
+				},
 
-			_ => (),
-		}
-	})?;
+				_ => (),
+			}
+		})
+		.map_err(|error| calloop::InsertError::<Box<dyn Any>> {
+			inserted: Box::new(error.inserted),
+			error: error.error,
+		})?;
 
 	Ok(())
 }

@@ -26,7 +26,7 @@ use smithay::{
 };
 use tracing::{event, span, Level};
 
-use crate::wayland::{grabs::PRIMARY_BUTTON, state};
+use super::{super::state, PRIMARY_BUTTON};
 
 type Point<N = i32, Space = LogicalSpace> = smithay::utils::Point<N, Space>;
 
