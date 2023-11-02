@@ -50,7 +50,7 @@ pub enum Error {
 	Winit(#[from] winit::Error),
 }
 
-pub fn run() -> Result<(), Error> {
+pub fn run(testing: bool) -> Result<(), Error> {
 	// Log initialisation.
 	let init_span = span!(Level::INFO, "Initialising AquariWM (Wayland)").entered();
 
@@ -61,10 +61,12 @@ pub fn run() -> Result<(), Error> {
 
 	// Init winit for testing if the testing feature is enabled.
 	#[cfg(feature = "testing")]
-	init_winit(&mut event_loop, &mut state)?;
+	if testing {
+		init_winit(&mut event_loop, &mut state)?;
 
-	// Attempt to launch a terminal.
-	crate::launch_terminal();
+		// Attempt to launch a terminal.
+		crate::launch_terminal();
+	}
 
 	// End the initialisation span.
 	init_span.exit();

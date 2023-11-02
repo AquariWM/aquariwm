@@ -11,8 +11,25 @@ pub struct Cli {
 	#[arg(long, alias = "test")]
 	pub testing: bool,
 
+	/// Disables `testing`.
+	#[cfg(feature = "testing")]
+	#[arg(long = "no-testing", alias = "no-test", overrides_with = "testing")]
+	pub no_testing: bool,
+
 	#[command(subcommand)]
 	pub subcommand: Option<Subcommand>,
+}
+
+impl Cli {
+	/// Returns whether testing is enabled.
+	#[cfg(feature = "testing")]
+	pub fn testing(&self) -> bool {
+		if cfg!(debug_assertions) {
+			!self.no_testing
+		} else {
+			self.testing
+		}
+	}
 }
 
 #[derive(Debug, clap::Subcommand)]

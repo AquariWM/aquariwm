@@ -21,14 +21,14 @@ fn main() -> Result<(), Box<dyn Error>> {
 	let args = cli::Cli::parse();
 
 	#[cfg(feature = "testing")]
-	let testing = args.testing;
+	let testing = args.testing();
 	#[cfg(not(feature = "testing"))]
 	let testing = false;
 
 	#[cfg(any(feature = "wayland", feature = "x11"))]
 	match &args.subcommand {
 		#[cfg(feature = "wayland")]
-		Some(cli::Subcommand::Wayland) => display_server::wayland::run()?,
+		Some(cli::Subcommand::Wayland) => display_server::wayland::run(testing)?,
 		#[cfg(feature = "x11")]
 		Some(cli::Subcommand::X11) => display_server::x11::run(testing)?,
 
@@ -38,16 +38,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 	Ok(())
 }
 
-/// Attempts to launch a terminal if the `testing` feature is enabled, or if the crate is built
-/// using the debug profile.
 pub fn launch_terminal() {
-	if cfg!(feature = "testing") {
-		if let Some(terminal) = env::var_os("TERM") {
-			match process::Command::new(&terminal).spawn() {
-				Ok(_) => event!(Level::INFO, "Launched {terminal:?}"),
+	if let Some(terminal) = env::var_os("TERM") {
+		match process::Command::new(&terminal).spawn() {
+			Ok(_) => event!(Level::INFO, "Launched {terminal:?}"),
 
-				Err(error) => event!(Level::WARN, "Failed to launch {terminal:?}: {error}"),
-			}
+			Err(error) => event!(Level::WARN, "Failed to launch {terminal:?}: {error}"),
 		}
 	}
 }

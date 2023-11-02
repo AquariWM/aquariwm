@@ -131,12 +131,6 @@ mod testing {
 pub fn run(testing: bool) -> Result<()> {
 	let init_span = span!(Level::INFO, "Initialisation").entered();
 
-	if testing {
-		event!(Level::INFO, "Testing mode enabled");
-	} else {
-		event!(Level::TRACE, "Testing mode disabled");
-	}
-
 	// Spawn Xephyr - a nested X server - if `testing` is enabled so AquariWM runs in a testing
 	// window. Keep it in scope so it can be killed when it is dropped.
 	let _process = testing.then_some(testing::Xephyr::spawn()?);
@@ -174,8 +168,12 @@ pub fn run(testing: bool) -> Result<()> {
 		},
 	}
 
-	// Attempt to launch a terminal.
-	crate::launch_terminal();
+	if testing {
+		event!(Level::INFO, "Testing mode enabled");
+
+		// Attempt to launch a terminal.
+		crate::launch_terminal();
+	}
 
 	init_span.exit();
 
