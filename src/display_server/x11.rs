@@ -7,9 +7,9 @@ use std::{env, io, thread};
 use tracing::{event, span, Level};
 use xcb::x::{self as x11, Circulate, Cw as Attribute, EventMask, Place};
 
-mod util;
+use crate::display_server::DisplayServer;
 
-pub const NAME: &str = "AquariWM (X11)";
+mod util;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -69,7 +69,10 @@ mod testing {
 				event!(Level::DEBUG, "Initialising winit window");
 
 				let event_loop = WinitEventLoopBuilder::new().with_any_thread(true).build().unwrap();
-				let window = WinitWindowBuilder::new().with_title(NAME).build(&event_loop).unwrap();
+				let window = WinitWindowBuilder::new()
+					.with_title(X11::title())
+					.build(&event_loop)
+					.unwrap();
 
 				// Send the window's window ID back to the main thread so it can be supplied to `Xephyr`.
 				transmitter.send(u64::from(window.id())).unwrap();
@@ -128,105 +131,112 @@ mod testing {
 	}
 }
 
-pub fn run(testing: bool) -> Result<()> {
-	let init_span = span!(Level::INFO, "Initialisation").entered();
+pub struct X11;
 
-	// Spawn Xephyr - a nested X server - if `testing` is enabled so AquariWM runs in a testing
-	// window. Keep it in scope so it can be killed when it is dropped.
-	let _process = testing.then_some(testing::Xephyr::spawn()?);
+impl DisplayServer for X11 {
+	type Error = Error;
+	const NAME: &'static str = "X11";
 
-	// Connect to the X server.
-	let (connection, screen_num) = xcb::Connection::connect(None)?;
+	fn run(testing: bool) -> Result<()> {
+		let init_span = span!(Level::INFO, "Initialisation").entered();
 
-	// Get the setup and screen.
-	let setup = connection.get_setup();
-	let screen = setup.roots().nth(screen_num as usize).unwrap();
+		// Spawn Xephyr - a nested X server - if `testing` is enabled so AquariWM runs in a testing
+		// window. Keep it in scope so it can be killed when it is dropped.
+		let _process = testing.then_some(testing::Xephyr::spawn()?);
 
-	// The root window of the screen.
-	let root = screen.root();
+		// Connect to the X server.
+		let (connection, screen_num) = xcb::Connection::connect(None)?;
 
-	// Register for SUBSTRUCTURE_NOTIFY and SUBSTRUCTURE_REDIRECT events on the root window; this
-	// means registering as a window manager.
-	let cookie = connection.send_request_checked(&x11::ChangeWindowAttributes {
-		window: root,
-		value_list: &[Attribute::EventMask(
-			EventMask::SUBSTRUCTURE_NOTIFY | EventMask::SUBSTRUCTURE_REDIRECT,
-		)],
-	});
+		// Get the setup and screen.
+		let setup = connection.get_setup();
+		let screen = setup.roots().nth(screen_num as usize).unwrap();
 
-	match connection.check_request(cookie) {
-		Ok(_) => event!(Level::INFO, "Successfully registered window manager"),
+		// The root window of the screen.
+		let root = screen.root();
 
-		// If we failed to register the window manager, exit the program.
-		Err(error) => {
-			event!(
-				Level::ERROR,
-				"Failed to register window manager; a window manager is already running!",
-			);
+		// Register for SUBSTRUCTURE_NOTIFY and SUBSTRUCTURE_REDIRECT events on the root window; this
+		// means registering as a window manager.
+		let cookie = connection.send_request_checked(&x11::ChangeWindowAttributes {
+			window: root,
+			value_list: &[Attribute::EventMask(
+				EventMask::SUBSTRUCTURE_NOTIFY | EventMask::SUBSTRUCTURE_REDIRECT,
+			)],
+		});
 
-			return Err(error.into());
-		},
-	}
+		match connection.check_request(cookie) {
+			Ok(_) => event!(Level::INFO, "Successfully registered window manager"),
 
-	if testing {
-		event!(Level::INFO, "Testing mode enabled");
+			// If we failed to register the window manager, exit the program.
+			Err(error) => {
+				event!(
+					Level::ERROR,
+					"Failed to register window manager; a window manager is already running!",
+				);
 
-		// Attempt to launch a terminal.
-		crate::launch_terminal();
-	}
+				return Err(error.into());
+			},
+		}
 
-	init_span.exit();
+		if testing {
+			event!(Level::INFO, "Testing mode enabled");
 
-	let event_loop_span = span!(Level::DEBUG, "Event loop");
+			// Attempt to launch a terminal.
+			crate::launch_terminal();
+		}
 
-	// The window manager's event loop.
-	loop {
-		let _span = event_loop_span.enter();
+		init_span.exit();
 
-		// Flush requests sent in the previous iteration.
-		connection.flush()?;
+		let event_loop_span = span!(Level::DEBUG, "Event loop");
 
-		match connection.wait_for_event()? {
-			// X11 core protocol events.
-			xcb::Event::X(event) => match event {
-				// If a client requests to map its window, map it. For a tiling layout, this should
-				// place it in the tiling layout when mapping it.
-				x11::Event::MapRequest(request) => {
-					connection.send_request(&x11::MapWindow {
-						window: request.window(),
-					});
+		// The window manager's event loop.
+		loop {
+			let _span = event_loop_span.enter();
+
+			// Flush requests sent in the previous iteration.
+			connection.flush()?;
+
+			match connection.wait_for_event()? {
+				// X11 core protocol events.
+				xcb::Event::X(event) => match event {
+					// If a client requests to map its window, map it. For a tiling layout, this should
+					// place it in the tiling layout when mapping it.
+					x11::Event::MapRequest(request) => {
+						connection.send_request(&x11::MapWindow {
+							window: request.window(),
+						});
+					},
+
+					// If a client requests to configure its window, honor it. For a tiling layout, this
+					// should modify the configure request to place it in the tiling layout.
+					x11::Event::ConfigureRequest(request) => {
+						connection.send_request(&x11::ConfigureWindow {
+							window: request.window(),
+							value_list: &util::value_list(&request),
+						});
+					},
+
+					// If a client requests to raise or lower its window, honor it. For a tiling layout,
+					// this should be rejected for tiled windows, as they should always be at the bottom
+					// of the stack.
+					x11::Event::CirculateRequest(request) => {
+						util::circulate_window(
+							&connection,
+							request.window(),
+							match request.place() {
+								Place::OnTop => Circulate::RaiseLowest,
+								Place::OnBottom => Circulate::LowerHighest,
+							},
+						);
+					},
+
+					// TODO: for tiling layouts, remove the window from the layout.
+					x11::Event::UnmapNotify(_notification) => {},
+
+					_ => (),
 				},
-
-				// If a client requests to configure its window, honor it. For a tiling layout, this
-				// should modify the configure request to place it in the tiling layout.
-				x11::Event::ConfigureRequest(request) => {
-					connection.send_request(&x11::ConfigureWindow {
-						window: request.window(),
-						value_list: &util::value_list(&request),
-					});
-				},
-
-				// If a client requests to raise or lower its window, honor it. For a tiling layout,
-				// this should be rejected for tiled windows, as they should always be at the bottom
-				// of the stack.
-				x11::Event::CirculateRequest(request) => {
-					util::circulate_window(
-						&connection,
-						request.window(),
-						match request.place() {
-							Place::OnTop => Circulate::RaiseLowest,
-							Place::OnBottom => Circulate::LowerHighest,
-						},
-					);
-				},
-
-				// TODO: for tiling layouts, remove the window from the layout.
-				x11::Event::UnmapNotify(_notification) => {},
 
 				_ => (),
-			},
-
-			_ => (),
+			}
 		}
 	}
 }
