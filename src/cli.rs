@@ -17,18 +17,22 @@ pub struct Cli {
 	pub no_testing: bool,
 
 	#[command(subcommand)]
-	pub subcommand: Option<Subcommand>,
+	pub subcommand: Subcommand,
 }
 
 impl Cli {
 	/// Returns whether testing is enabled.
-	#[cfg(feature = "testing")]
+	#[inline]
 	pub fn testing(&self) -> bool {
-		if cfg!(debug_assertions) {
+		#[cfg(feature = "testing")]
+		return if cfg!(debug_assertions) {
 			!self.no_testing
 		} else {
 			self.testing
-		}
+		};
+
+		#[cfg(not(feature = "testing"))]
+		false
 	}
 }
 

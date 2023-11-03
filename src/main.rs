@@ -7,35 +7,34 @@ use std::{env, error::Error, process};
 use clap::Parser;
 use tracing::{event, Level};
 
+use crate::display_server::DisplayServer;
+
 mod cli;
 pub mod display_server;
 pub mod layout;
 
+#[cfg(not(any(feature = "wayland", feature = "x11")))]
+compile_error!("At least one display server feature must be enabled for AquariWM to function.");
+
 fn main() -> Result<(), Box<dyn Error>> {
-	if let Ok(env_filter) = tracing_subscriber::EnvFilter::try_from_default_env() {
-		tracing_subscriber::fmt().with_env_filter(env_filter).init();
-	} else {
-		tracing_subscriber::fmt().init();
+	// Initiate `tracing_subscriber` for formatting logs.
+	match tracing_subscriber::EnvFilter::try_from_default_env() {
+		Ok(env_filter) => tracing_subscriber::fmt().with_env_filter(env_filter).init(),
+
+		Err(_) => tracing_subscriber::fmt().init(),
 	}
 
+	// Parse command line subcommand and options.
 	let args = cli::Cli::parse();
-
-	#[cfg(feature = "testing")]
+	// Whether testing is enabled.
 	let testing = args.testing();
-	#[cfg(not(feature = "testing"))]
-	let testing = false;
 
-	#[cfg(any(feature = "wayland", feature = "x11"))]
 	match &args.subcommand {
 		#[cfg(feature = "wayland")]
-		Some(cli::Subcommand::Wayland) => display_server::wayland::run(testing)?,
+		cli::Subcommand::Wayland => Ok(display_server::Wayland::run(testing)?),
 		#[cfg(feature = "x11")]
-		Some(cli::Subcommand::X11) => display_server::x11::run(testing)?,
-
-		None => todo!("Automatically determine running display server..."),
+		cli::Subcommand::X11 => Ok(display_server::X11::run(testing)?),
 	}
-
-	Ok(())
 }
 
 pub fn launch_terminal() {
