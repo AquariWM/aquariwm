@@ -73,7 +73,10 @@ impl DisplayServer for Wayland {
 			Self::init_winit(&mut event_loop, &mut state)?;
 
 			// Attempt to launch a terminal.
-			crate::launch_terminal();
+			match crate::launch_terminal() {
+				Ok((name, _)) => event!(Level::INFO, "Launched {name:?}"),
+				Err(error) => event!(Level::WARN, "Failed to launch terminal: {error}"),
+			}
 		}
 
 		// End the initialisation span.

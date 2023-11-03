@@ -181,7 +181,10 @@ impl DisplayServer for X11 {
 			event!(Level::INFO, "Testing mode enabled");
 
 			// Attempt to launch a terminal.
-			crate::launch_terminal();
+			match crate::launch_terminal() {
+				Ok((name, _)) => event!(Level::INFO, "Launched {name:?}"),
+				Err(error) => event!(Level::WARN, "Failed to launch terminal: {error}"),
+			}
 		}
 
 		init_span.exit();

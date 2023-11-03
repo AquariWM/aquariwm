@@ -2,10 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use std::{env, error::Error, process};
+use std::{env, error::Error, ffi::OsString, io, process};
 
 use clap::Parser;
-use tracing::{event, Level};
+use thiserror::Error;
 
 use crate::display_server::DisplayServer;
 
@@ -37,12 +37,32 @@ fn main() -> Result<(), Box<dyn Error>> {
 	}
 }
 
-pub fn launch_terminal() {
-	if let Some(terminal) = env::var_os("TERM") {
-		match process::Command::new(&terminal).spawn() {
-			Ok(_) => event!(Level::INFO, "Launched {terminal:?}"),
+/// An error returned by [`launch_terminal`].
+#[derive(Debug, Error)]
+pub enum LaunchTerminalError {
+	/// The `TERM` environment variable was not set to any terminal.
+	#[error("the `TERM` environment variable is not set")]
+	VarNotPresent,
 
-			Err(error) => event!(Level::WARN, "Failed to launch {terminal:?}: {error}"),
-		}
+	/// An IO error occurred trying to launch the `TERM` terminal.
+	#[error(transparent)]
+	Io(#[from] io::Error),
+}
+
+/// Attempts to launch the terminal set in the `TERM` environment variable.
+///
+/// If successful, returns the launched terminal process and the contents of the `TERM` environment
+/// variable launched.
+pub fn launch_terminal() -> Result<(OsString, process::Child), LaunchTerminalError> {
+	match env::var_os("TERM") {
+		// `TERM` is present.
+		Some(terminal) => {
+			let process = process::Command::new(&terminal).spawn()?;
+
+			Ok((terminal, process))
+		},
+
+		// `TERM` is not present.
+		None => Err(LaunchTerminalError::VarNotPresent),
 	}
 }
