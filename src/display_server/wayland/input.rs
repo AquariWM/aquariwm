@@ -21,7 +21,7 @@ use smithay::{
 
 use super::state;
 
-impl state::AquariWm {
+impl state::WaylandState {
 	pub fn process_input_event<Backend: InputBackend>(&mut self, event: InputEvent<Backend>) {
 		match event {
 			InputEvent::Keyboard { event, .. } => {
@@ -149,10 +149,8 @@ impl state::AquariWm {
 							}
 						}
 
-						if source == AxisSource::Finger {
-							if event.amount(axis) == Some(0.0) {
-								frame = frame.stop(axis);
-							}
+						if source == AxisSource::Finger && event.amount(axis) == Some(0.0) {
+							frame = frame.stop(axis);
 						}
 					};
 
