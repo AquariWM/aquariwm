@@ -3,14 +3,14 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 use std::{
-	cell::{RefCell, UnsafeCell},
 	future::Future,
-	pin::{pin, Pin},
-	rc::Rc,
+	marker::PhantomData,
+	pin::Pin,
+	sync::{Arc, Mutex},
 	task::{Context, Poll, Waker},
 };
 
-use futures::future;
+use futures::future::BoxFuture;
 use tracing::{event, span, Level};
 use x11::Cw as WindowAttribute;
 use xcb::{x as x11, x::EventMask};
@@ -24,15 +24,25 @@ struct SharedState {
 }
 
 pub struct WindowManager {
+	state: state::AquariWm<x11::Window>,
+	connection: Connection,
+}
+
+pub struct Connection {
 	screen_num: i32,
 	root: x11::Window,
-	state: state::AquariWm<x11::Window>,
 
-	connection: xcb::Connection,
-	cookies: UnsafeCell<Vec<Rc<RefCell<SharedState>>>>,
+	xcb_conn: xcb::Connection,
+	cookies: Mutex<Vec<Arc<Mutex<SharedState>>>>,
 }
 
 impl WindowManager {
+	pub fn state(&mut self) -> &mut state::AquariWm<x11::Window> {
+		&mut self.state
+	}
+}
+
+impl Connection {
 	/// Sends a `request` that has a reply.
 	///
 	/// This function returns a [future]. [Futures](future) are lazy: calling this function won't do
@@ -74,14 +84,14 @@ impl WindowManager {
 	///
 	/// [future]: Future
 	pub fn send_request_with_reply<'conn, Req: xcb::RequestWithReply<Cookie = <Req as xcb::Request>::Cookie>>(
-		&'conn self,
+		&'conn mut self,
 		request: &'conn Req,
 	) -> impl Future<Output = xcb::Result<<<Req as xcb::RequestWithReply>::Cookie as xcb::CookieWithReplyChecked>::Reply>>
 	       + 'conn
 	where
 		<Req as xcb::Request>::Cookie: xcb::CookieWithReplyChecked,
 	{
-		CookieCheckedFuture::new(&self, self.connection.send_request(request))
+		CookieCheckedFuture::new(self, self.xcb_conn.send_request(request))
 	}
 
 	/// Sends a `request` that has a reply, without checking for errors.
@@ -99,7 +109,7 @@ impl WindowManager {
 		'conn,
 		Req: xcb::RequestWithReply<CookieUnchecked = <Req as xcb::Request>::Cookie>,
 	>(
-		&'conn self,
+		&'conn mut self,
 		request: &'conn Req,
 	) -> impl Future<
 		Output = xcb::ConnResult<
@@ -109,12 +119,19 @@ impl WindowManager {
 	where
 		<Req as xcb::Request>::Cookie: xcb::CookieWithReplyUnchecked + 'conn,
 	{
-		CookieUncheckedFuture::new(&self, self.connection.send_request(request))
+		CookieUncheckedFuture::new(self, self.xcb_conn.send_request(request))
+	}
+
+	/// Gets setup information from the X server.
+	///
+	/// See [`xcb::Connection::get_setup`] for more information.
+	pub fn get_setup(&self) -> &x11::Setup {
+		self.xcb_conn.get_setup()
 	}
 
 	/// Sends a `request` that has no reply, without checking for errors.
-	pub fn send_request<Req: xcb::RequestWithoutReply>(&self, request: &Req) {
-		self.connection.send_request(request);
+	pub fn send_request<Req: xcb::RequestWithoutReply>(&mut self, request: &Req) {
+		self.xcb_conn.send_request(request);
 	}
 
 	/// Sends a `request` that has no reply, checking for errors.
@@ -126,8 +143,8 @@ impl WindowManager {
 	///
 	/// [future]: Future
 	/// [`check_request`]: Self::check_request
-	pub fn send_request_checked<Req: xcb::RequestWithoutReply>(&self, request: &Req) -> xcb::VoidCookieChecked {
-		self.connection.send_request_checked(request)
+	pub fn send_request_checked<Req: xcb::RequestWithoutReply>(&mut self, request: &Req) -> xcb::VoidCookieChecked {
+		self.xcb_conn.send_request_checked(request)
 	}
 
 	/// Checks for errors returned by a request that has no reply.
@@ -139,22 +156,72 @@ impl WindowManager {
 	/// equivalent.
 	///
 	/// [`send_request_checked`]: Self::send_request_checked
-	pub fn check_request(&self, cookie: xcb::VoidCookieChecked) -> xcb::ProtocolResult<()> {
-		self.connection.check_request(cookie)
+	pub fn check_request(&mut self, cookie: xcb::VoidCookieChecked) -> xcb::ProtocolResult<()> {
+		self.xcb_conn.check_request(cookie)
 	}
 
+	/// Moves the given `window` to the [bottom] or [top] of the window stack if it is [floating].
+	///
+	/// [Tiled] windows will not be circulated.
+	///
+	/// If the window is moved to the [bottom] of the stack, then all [tiled] windows will then be
+	/// moved to the [bottom] so that [tiled] windows are always at the [bottom] of the stack.
+	///
+	/// [bottom]: x11::Circulate::LowerHighest
+	/// [top]: x11::Circulate::RaiseLowest
+	///
+	/// [floating]: layout::Mode::Floating
+	/// [tiled]: layout::Mode::Tiled
+	/// [Tiled]: layout::Mode::Tiled
+	pub fn circulate_window(
+		&mut self,
+		state: &state::AquariWm<x11::Window>,
+		window: x11::Window,
+		direction: x11::Circulate,
+	) {
+		// Only circulate the window if it is floating.
+		if let Some(state::WindowState {
+			mode: layout::Mode::Floating,
+			..
+		}) = state.windows.get(&window)
+		{
+			// Circulate the window.
+			self.xcb_conn.send_request(&x11::CirculateWindow { window, direction });
+
+			// If the window was lowered to the bottom, then lower all the tiled windows below it again.
+			if direction == x11::Circulate::LowerHighest {
+				let tiled_windows = state.windows.iter().filter_map(|(window, state)| match state.mode {
+					layout::Mode::Tiled => Some(window),
+
+					layout::Mode::Floating => None,
+				});
+
+				// Move each tiled window to the bottom.
+				for &window in tiled_windows {
+					self.xcb_conn.send_request(&x11::CirculateWindow {
+						window,
+						direction: x11::Circulate::LowerHighest,
+					});
+				}
+			}
+		}
+	}
+}
+
+// TODO: restructure for having `Connection` be separate to `WindowManager`.
+impl WindowManager {
 	/// Initiates a connection to the X server and initialises AquariWM state.
 	///
 	/// If `display_name` is specified, the connection is made to that display. Otherwise, the
 	/// display specified by the `DISPLAY` environment variable is used.
-	pub async fn new(display_name: Option<&str>) -> xcb::Result<Self> {
+	pub fn new(display_name: Option<&str>) -> xcb::Result<Self> {
 		let _init_span = span!(Level::INFO, "Initialisation").entered();
 
 		// Connect to the X server.
-		let (connection, screen_num) = xcb::Connection::connect(display_name)?;
+		let (xcb_conn, screen_num) = xcb::Connection::connect(display_name)?;
 
 		// Get the setup and, with it, the screen.
-		let setup = connection.get_setup();
+		let setup = xcb_conn.get_setup();
 		let screen = setup.roots().nth(screen_num as usize).unwrap();
 
 		// Get the root window of the screen.
@@ -162,7 +229,7 @@ impl WindowManager {
 
 		// Register for SUBSTRUCTURE_NOTIFY and SUBSTRUCTURE_REDIRECT events on the root window; this
 		// means registering as a window manager.
-		let result = connection.send_and_check_request(&x11::ChangeWindowAttributes {
+		let result = xcb_conn.send_and_check_request(&x11::ChangeWindowAttributes {
 			window: root,
 			value_list: &[WindowAttribute::EventMask(
 				EventMask::SUBSTRUCTURE_NOTIFY | EventMask::SUBSTRUCTURE_REDIRECT,
@@ -184,16 +251,16 @@ impl WindowManager {
 
 		// Unfortunately, we can't join these replies using async because until the event loop,
 		// there is nothing to poll them.
-		let cookie = connection.send_request(&x11::QueryTree { window: root });
-		let windows: Vec<_> = connection.wait_for_reply(cookie)?.children().iter().copied().collect();
+		let cookie = xcb_conn.send_request(&x11::QueryTree { window: root });
+		let windows: Vec<_> = xcb_conn.wait_for_reply(cookie)?.children().iter().copied().collect();
 
 		let cookies: Vec<_> = windows
 			.iter()
-			.map(|&window| connection.send_request(&x11::GetWindowAttributes { window }))
+			.map(|&window| xcb_conn.send_request(&x11::GetWindowAttributes { window }))
 			.collect();
 		let replies: Vec<_> = cookies
 			.into_iter()
-			.map(|cookie| connection.wait_for_reply(cookie))
+			.map(|cookie| xcb_conn.wait_for_reply(cookie))
 			.try_collect()?;
 
 		let windows = windows
@@ -201,57 +268,106 @@ impl WindowManager {
 			.zip(replies.into_iter().map(|reply| reply.map_state().into()));
 
 		Ok(Self {
-			screen_num,
-			root,
 			state: state::AquariWm::with_windows(windows),
+			connection: Connection {
+				screen_num,
+				root,
 
-			connection,
-			cookies: UnsafeCell::new(Vec::new()),
+				xcb_conn,
+				cookies: Mutex::new(Vec::new()),
+			},
 		})
-	}
-
-	/// Gets setup information from the X server.
-	///
-	/// See [`xcb::Connection::get_setup`] for more information.
-	pub fn get_setup(&self) -> &x11::Setup {
-		self.connection.get_setup()
 	}
 
 	/// Runs the connection's event loop.
 	///
-	/// This function polls all yet-to-be-received replies and
-	pub async fn run<EventLoop, EventLoopFuture>(&mut self, event_loop: EventLoop) -> xcb::Result<()>
+	/// This function polls all yet-to-be-received replies and calls the given `event_loop` when new
+	/// [events] are received.
+	///
+	/// [`Hack`] must be used surrounding an `async` block in the body of the `event_loop` closure
+	/// due to Rust limitations.
+	///
+	/// # Examples
+	/// ```no_run
+	/// # use aquariwm::display_server::x11::util;
+	/// # use xcb::x as x11;
+	/// #
+	/// # #[tokio::main]
+	/// # async fn main() -> xcb::Result<()> {
+	/// #     let connection = util::Connection::new(None)?;
+	/// #
+	/// connection.run(|connection, state, event| {
+	///     util::Hack::new(async {
+	///         match event {
+	///             xcb::Event(x11::Event::CreateNotify(notification)) => {
+	///
+	///         }
+	///     })
+	/// })
+	/// .await?;
+	/// # }
+	/// ```
+	///
+	/// [events]: xcb::Event
+	pub async fn run<'event_loop, EventLoop: 'event_loop>(&mut self, event_loop: EventLoop) -> xcb::Result<()>
 	where
-		EventLoop: FnMut(&mut Self, &mut state::AquariWm<x11::Window>, xcb::Event) -> EventLoopFuture,
-		EventLoopFuture: Future<Output = xcb::Result<()>>,
+		EventLoop: Unpin,
+		EventLoop: for<'conn> FnMut(
+			&'conn mut Connection,
+			&'conn mut state::AquariWm<x11::Window>,
+			xcb::Event,
+		) -> Hack<'conn, 'event_loop, xcb::Result<()>>,
 	{
 		RunFuture::new(self, event_loop).await
 	}
 }
 
-pub struct RunFuture<'conn, EventLoop, EventLoopFuture>
-where
-	EventLoop: FnMut(&'conn mut WindowManager, &'conn mut state::AquariWm<x11::Window>, xcb::Event) -> EventLoopFuture,
-	EventLoop: 'conn,
+/// A wrapper around a [`BoxFuture`] required for an async closure with `&mut` parameters.
+///
+/// See [Using async closures with mut ref][hack] for more information.
+///
+/// [hack]: https://users.rust-lang.org/t/using-async-closures-with-mut-ref/47240/2
+pub struct Hack<'short, 'long: 'short, Ret = ()>(BoxFuture<'short, Ret>, PhantomData<&'long ()>);
 
-	EventLoopFuture: Future<Output = xcb::Result<()>>,
-	EventLoopFuture: 'conn,
-{
-	connection: &'conn mut WindowManager,
+impl<'short, 'long: 'short, Ret> Hack<'short, 'long, Ret> {
+	/// Creates a new `Hack` wrapper around the given `future`.
+	pub fn new(future: impl Future<Output = Ret> + Send + 'short) -> Self {
+		Self(Box::pin(future), PhantomData)
+	}
 
-	event_loop: EventLoop,
-	event_loop_future: Option<Pin<&'conn mut EventLoopFuture>>,
+	/// Returns the wrapped [`BoxFuture`].
+	pub fn unwrap(self) -> BoxFuture<'short, Ret> {
+		self.0
+	}
 }
 
-impl<'conn, EventLoop, EventLoopFuture> RunFuture<'conn, EventLoop, EventLoopFuture>
+pub struct RunFuture<'window_manager, 'event_loop, EventLoop: 'event_loop>
 where
-	EventLoop:
-		FnMut(&'conn mut WindowManager, &'conn mut state::AquariWm<x11::Window>, xcb::Event) -> EventLoopFuture + 'conn,
-	EventLoopFuture: Future<Output = xcb::Result<()>>,
+	EventLoop: Unpin,
+	EventLoop: for<'wm> FnMut(
+		&'wm mut Connection,
+		&'wm mut state::AquariWm<x11::Window>,
+		xcb::Event,
+	) -> Hack<'wm, 'event_loop, xcb::Result<()>>,
 {
-	pub(self) fn new(connection: &'conn mut WindowManager, event_loop: EventLoop) -> Self {
+	window_manager: &'window_manager mut WindowManager,
+
+	event_loop: EventLoop,
+	event_loop_future: Option<Hack<'window_manager, 'event_loop, xcb::Result<()>>>,
+}
+
+impl<'window_manager, 'event_loop, EventLoop: 'event_loop> RunFuture<'window_manager, 'event_loop, EventLoop>
+where
+	EventLoop: Unpin,
+	EventLoop: for<'wm> FnMut(
+		&'wm mut Connection,
+		&'wm mut state::AquariWm<x11::Window>,
+		xcb::Event,
+	) -> Hack<'wm, 'event_loop, xcb::Result<()>>,
+{
+	pub(self) fn new(window_manager: &'window_manager mut WindowManager, event_loop: EventLoop) -> Self {
 		Self {
-			connection,
+			window_manager,
 
 			event_loop,
 			event_loop_future: None,
@@ -259,46 +375,56 @@ where
 	}
 }
 
-impl<'conn, EventLoop, EventLoopFuture> Future for RunFuture<'conn, EventLoop, EventLoopFuture>
+impl<'window_manager, 'event_loop, EventLoop: 'event_loop> Future for RunFuture<'window_manager, 'event_loop, EventLoop>
 where
-	EventLoop: FnMut(&'conn mut WindowManager, &'conn mut state::AquariWm<x11::Window>, xcb::Event) -> EventLoopFuture,
-	EventLoopFuture: Future<Output = xcb::Result<()>>,
+	EventLoop: Unpin,
+	EventLoop: for<'wm> FnMut(
+		&'wm mut Connection,
+		&'wm mut state::AquariWm<x11::Window>,
+		xcb::Event,
+	) -> Hack<'wm, 'event_loop, xcb::Result<()>>,
 {
 	type Output = xcb::Result<()>;
 
-	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		// Flush requests from the previous iteration.
-		self.connection.connection.flush()?;
+		self.window_manager.connection.xcb_conn.flush()?;
 
-		// Remove completed cookies.
-		unsafe {
-			self.connection
+		// Introduce a new scope for to wake the cookies so that the mutex guard's shared reference
+		// is dropped so that mutable references can be used later.
+		{
+			let cookie_states = &mut self
+				.window_manager
+				.connection
 				.cookies
-				.get()
-				.as_mut()
-				.unwrap_unchecked()
-				.retain(|state| !state.borrow().completed);
-		}
+				.lock()
+				.expect("failed to lock mutex");
 
-		// Wake every cookie.
-		for cookie in unsafe { self.connection.cookies.get().as_ref().unwrap_unchecked().iter() } {
-			if let Some(waker) = cookie.borrow_mut().waker.take() {
-				waker.wake();
+			// Remove completed cookies.
+			cookie_states.retain(|state| !state.lock().expect("failed to lock mutex").completed);
+
+			// Wake every cookie.
+			for state in cookie_states.iter() {
+				if let Some(waker) = state.lock().expect("failed to lock mutex").waker.take() {
+					waker.wake();
+				}
 			}
 		}
 
 		// If there is no ongoing `event_loop` future, call `event_loop` again.
 		if self.event_loop_future.is_none() {
-			if let Some(event) = self.connection.connection.poll_for_event()? {
-				let future = (self.event_loop)(self.connection, &mut self.connection.state, event);
-				let pin = pin!(future);
-				self.event_loop_future = Some(pin);
+			if let Some(event) = self.window_manager.connection.xcb_conn.poll_for_event()? {
+				let WindowManager { connection, state } = &mut self.window_manager;
+
+				let hack = (self.event_loop)(connection, state, event);
+
+				self.event_loop_future = Some(hack);
 			}
 		}
 		// If there is an ongoing `event_loop` future, poll it.
-		if let Some(future) = &mut self.event_loop_future {
+		else if let Some(Hack(future, _)) = &mut self.event_loop_future {
 			// If `event_loop` has returned, reset the future.
-			if let Poll::Ready(result) = future.poll(cx) {
+			if let Poll::Ready(result) = future.as_mut().poll(cx) {
 				// Return an error if there was any.
 				if let Err(error) = result {
 					return Poll::Ready(Err(error));
@@ -320,7 +446,7 @@ where
 {
 	cookie: Cookie,
 	connection: &'conn xcb::Connection,
-	shared_state: Rc<RefCell<SharedState>>,
+	shared_state: Arc<Mutex<SharedState>>,
 }
 
 pub struct CookieUncheckedFuture<'conn, Cookie>
@@ -329,7 +455,7 @@ where
 {
 	cookie: Cookie,
 	connection: &'conn xcb::Connection,
-	shared_state: Rc<RefCell<SharedState>>,
+	shared_state: Arc<Mutex<SharedState>>,
 }
 
 impl<'conn, Cookie> Future for CookieCheckedFuture<'conn, Cookie>
@@ -346,12 +472,13 @@ where
 			Err(error) => Poll::Ready(Err(error)),
 		};
 
+		let shared_state = &mut self.shared_state.lock().expect("failed to lock mutex");
 		match &poll {
 			Poll::Pending => {
-				self.shared_state.borrow_mut().waker = Some(cx.waker().clone());
+				shared_state.waker = Some(cx.waker().clone());
 			},
 			Poll::Ready(_) => {
-				self.shared_state.borrow_mut().completed = true;
+				shared_state.completed = true;
 			},
 		}
 
@@ -374,12 +501,13 @@ where
 			Err(error) => Poll::Ready(Err(error)),
 		};
 
+		let shared_state = &mut self.shared_state.lock().expect("failed to lock mutex");
 		match &poll {
 			Poll::Pending => {
-				self.shared_state.borrow_mut().waker = Some(cx.waker().clone());
+				shared_state.waker = Some(cx.waker().clone());
 			},
 			Poll::Ready(_) => {
-				self.shared_state.borrow_mut().completed = true;
+				shared_state.completed = true;
 			},
 		}
 
@@ -391,23 +519,16 @@ impl<'conn, Cookie> CookieCheckedFuture<'conn, Cookie>
 where
 	Cookie: xcb::CookieWithReplyChecked,
 {
-	pub(self) fn new(connection: &'conn WindowManager, cookie: Cookie) -> Self {
-		let shared_state = Rc::new(RefCell::new(SharedState {
+	pub(self) fn new(connection: &'conn Connection, cookie: Cookie) -> Self {
+		let shared_state = Arc::new(Mutex::new(SharedState {
 			waker: None,
 			completed: false,
 		}));
-		unsafe {
-			connection
-				.cookies
-				.get()
-				.as_mut()
-				.unwrap_unchecked()
-				.push(Rc::clone(&shared_state));
-		}
+		connection.cookies.lock().unwrap().push(Arc::clone(&shared_state));
 
 		Self {
 			cookie,
-			connection: &connection.connection,
+			connection: &connection.xcb_conn,
 			shared_state,
 		}
 	}
@@ -417,76 +538,26 @@ impl<'conn, Cookie> CookieUncheckedFuture<'conn, Cookie>
 where
 	Cookie: xcb::CookieWithReplyUnchecked,
 {
-	pub(self) fn new(connection: &'conn WindowManager, cookie: Cookie) -> Self {
-		let shared_state = Rc::new(RefCell::new(SharedState {
+	pub(self) fn new(connection: &'conn Connection, cookie: Cookie) -> Self {
+		let shared_state = Arc::new(Mutex::new(SharedState {
 			waker: None,
 			completed: false,
 		}));
-		unsafe {
-			connection
-				.cookies
-				.get()
-				.as_mut()
-				.unwrap_unchecked()
-				.push(Rc::clone(&shared_state));
-		}
+		connection
+			.cookies
+			.lock()
+			.expect("failed to lock mutex")
+			.push(Arc::clone(&shared_state));
 
 		Self {
 			cookie,
-			connection: &connection.connection,
+			connection: &connection.xcb_conn,
 			shared_state,
 		}
 	}
 }
 
-impl X11 {
-	/// Moves the given `window` to the [bottom] or [top] of the window stack if it is [floating].
-	///
-	/// [Tiled] windows will not be circulated.
-	///
-	/// If the window is moved to the [bottom] of the stack, then all [tiled] windows will then be
-	/// moved to the [bottom] so that [tiled] windows are always at the [bottom] of the stack.
-	///
-	/// [bottom]: x11::Circulate::LowerHighest
-	/// [top]: x11::Circulate::RaiseLowest
-	///
-	/// [floating]: layout::Mode::Floating
-	/// [tiled]: layout::Mode::Tiled
-	/// [Tiled]: layout::Mode::Tiled
-	pub fn circulate_window(&mut self, window: x11::Window, direction: x11::Circulate) {
-		// Only circulate the window if it is floating.
-		if let Some(state::WindowState {
-			mode: layout::Mode::Floating,
-			..
-		}) = self.state.windows.get(&window)
-		{
-			// Circulate the window.
-			self.connection
-				.send_request(&x11::CirculateWindow { window, direction });
-
-			// If the window was lowered to the bottom, then lower all the tiled windows below it again.
-			if direction == x11::Circulate::LowerHighest {
-				let tiled_windows = self
-					.state
-					.windows
-					.iter()
-					.filter_map(|(window, state)| match state.mode {
-						layout::Mode::Tiled => Some(window),
-
-						layout::Mode::Floating => None,
-					});
-
-				// Move each tiled window to the bottom.
-				for &window in tiled_windows {
-					self.connection.send_request(&x11::CirculateWindow {
-						window,
-						direction: x11::Circulate::LowerHighest,
-					});
-				}
-			}
-		}
-	}
-}
+impl X11 {}
 
 /// Represents the values of a [`x11::ConfigureRequestEvent`] or [`x11::ConfigureWindow`] request
 /// as optional fields.

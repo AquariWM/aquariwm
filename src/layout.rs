@@ -25,7 +25,7 @@ pub enum Mode {
 #[derive(Debug, Default)]
 pub enum Layout {
 	/// AquariWM is currently using a tiling layout.
-	Tiled(Box<dyn TilingLayout>),
+	Tiled(Box<dyn TilingLayout + Send + Sync>),
 
 	/// AquariWM is not currently using a tiling layout.
 	#[default]

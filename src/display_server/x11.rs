@@ -134,6 +134,7 @@ mod testing {
 	}
 }
 
+// TODO: remove
 pub struct X11 {
 	pub connection: util::WindowManager,
 	pub state: state::AquariWm<x11::Window>,
@@ -164,7 +165,7 @@ impl DisplayServer for X11 {
 			let _process = testing.then_some(testing::Xephyr::spawn()?);
 
 			// Connect to the X server and initialise AquariWM.
-			let mut connection = util::WindowManager::new(None).await?;
+			let mut connection = util::WindowManager::new(None)?;
 
 			if testing {
 				event!(Level::INFO, "Testing mode enabled");
@@ -178,7 +179,7 @@ impl DisplayServer for X11 {
 
 			Ok(connection
 				.run(|connection, state, event| {
-					async {
+					util::Hack::new(async {
 						match event {
 							// X11 core protocol events.
 							xcb::Event::X(event) => match event {
@@ -214,13 +215,14 @@ impl DisplayServer for X11 {
 								// this should be rejected for tiled windows, as they should always be at the bottom
 								// of the stack.
 								x11::Event::CirculateRequest(request) => {
-									// x.circulate_window(
-									// 	request.window(),
-									// 	match request.place() {
-									// 		Place::OnTop => Circulate::RaiseLowest,
-									// 		Place::OnBottom => Circulate::LowerHighest,
-									// 	},
-									// );
+									connection.circulate_window(
+										state,
+										request.window(),
+										match request.place() {
+											Place::OnTop => Circulate::RaiseLowest,
+											Place::OnBottom => Circulate::LowerHighest,
+										},
+									);
 								},
 
 								x11::Event::UnmapNotify(notification) => {
@@ -234,7 +236,7 @@ impl DisplayServer for X11 {
 						}
 
 						Ok(())
-					}
+					})
 				})
 				.await?)
 		}
