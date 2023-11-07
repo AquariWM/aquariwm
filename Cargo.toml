@@ -19,13 +19,13 @@ license = "MPL-2.0"
 default = ["wayland", "x11", "testing"]
 
 wayland = ["dep:smithay"]
-x11 = ["dep:xcb", "async", "winit?/x11"]
+x11 = ["dep:x11rb-async", "async", "winit?/x11"]
 
 # NOTE: winit is provided even if x11 is not enabled, because there is no way to specify that two
 #       features must be enabled for an optional dependency.
 testing = ["smithay?/backend_winit", "dep:winit"]
 # Features required for async AquariWM implementations (i.e. our X11 implementation).
-async = ["dep:futures", "dep:tokio"]
+async = []
 
 [dependencies]
 bitflags = "2.2.1"
@@ -44,31 +44,14 @@ tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 ####################################################################################################
 
 # X11
-[dependencies.xcb]
-# TODO: switch back to the official `rust-xcb` if https://github.com/rust-x-bindings/rust-xcb/pull/245
-#       is merged.
-git = "https://github.com/Antikyth/rust-xcb.git"
+[dependencies.x11rb-async]
+version = "0.12.0"
 optional = true
 
 # Wayland
 [dependencies.smithay]
-# TODO: switch back to the official `smithay` if https://github.com/Smithay/smithay/pull/1200 is
-#       merged.
-git = "https://github.com/Antikyth/smithay.git"
+version = "0.3.0"
 features = ["wayland_frontend", "desktop"]
-optional = true
-
-####################################################################################################
-# Async
-####################################################################################################
-
-[dependencies.futures]
-version = "0.3.29"
-optional = true
-
-[dependencies.tokio]
-version = "1.33.0"
-features = ["full"]
 optional = true
 
 ####################################################################################################
