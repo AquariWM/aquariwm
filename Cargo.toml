@@ -8,7 +8,6 @@ version = "0.1.0"
 authors = ["AquariWM", "Antikyth"]
 edition = "2021"
 readme = true
-homepage = "https://aquariwm.org/"
 repository = "https://github.com/AquariWM/aquariwm"
 license = "MPL-2.0"
 
