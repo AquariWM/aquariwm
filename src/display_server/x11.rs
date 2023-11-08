@@ -140,11 +140,7 @@ mod testing {
 	}
 }
 
-// TODO: remove
-pub struct X11 {
-	// pub connection: util::WindowManager,
-	pub state: state::AquariWm<x11::Window>,
-}
+pub struct X11;
 
 #[derive(Debug, Error)]
 #[error("Failed to parse {value}")]
@@ -177,6 +173,7 @@ impl DisplayServer for X11 {
 		async move {
 			// Spawn Xephyr - a nested X server - if `testing` is enabled so AquariWM runs in a testing
 			// window. Keep it in scope so it can be killed when it is dropped.
+			#[cfg(feature = "testing")]
 			let _process = testing.then_some(testing::Xephyr::spawn()?);
 
 			// Connect to the X server on the display specified by the `DISPLAY` env variable.
