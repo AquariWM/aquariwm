@@ -25,11 +25,13 @@ pub enum Mode {
 #[derive(Debug, Default)]
 pub enum Layout {
 	/// AquariWM is currently using a tiling layout.
-	Tiled(Box<dyn TilingLayout + Send + Sync>),
+	Tiled(Box<dyn TilingLayout>),
 
 	/// AquariWM is not currently using a tiling layout.
 	#[default]
 	Floating,
 }
 
-pub trait TilingLayout: Debug {}
+/// An implementation of a tiling window layout.
+// TODO: fill in tiling layout trait
+pub trait TilingLayout: Debug + Send + Sync {}
