@@ -4,7 +4,7 @@
 
 use std::{collections::HashMap, hash::Hash};
 
-use crate::layout::{self, Layout};
+use crate::layout::{self, CurrentLayout};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum MapState {
@@ -59,7 +59,7 @@ where
 	Window: Eq + Hash,
 {
 	/// The current window layout.
-	pub layout: Layout,
+	pub layout: CurrentLayout,
 
 	/// A [`HashMap`] of windows and their current [`WindowState`s].
 	///
@@ -81,29 +81,33 @@ impl<Window> AquariWm<Window>
 where
 	Window: Eq + Hash,
 {
-	/// Creates a new AquariWM state struct with the default [`Layout`] and no windows.
+	/// Creates a new AquariWM state struct with the default [`CurrentLayout`] and no windows.
 	#[inline]
 	pub fn new() -> Self {
-		Self::with_layout(Layout::default())
+		Self::with_layout(CurrentLayout::default())
 	}
 
 	/// Creates a new AquariWM state struct with the given `layout` and no windows.
 	#[inline]
-	pub fn with_layout(layout: Layout) -> Self {
+	pub fn with_layout(layout: CurrentLayout) -> Self {
 		Self {
 			layout,
 			windows: HashMap::new(),
 		}
 	}
 
-	/// Creates a new AquariWM state struct with the default [`Layout`] and the given `windows`.
+	/// Creates a new AquariWM state struct with the default [`CurrentLayout`] and the given
+	/// `windows`.
 	#[inline]
 	pub fn with_windows(windows: impl IntoIterator<Item = (Window, MapState)>) -> Self {
-		Self::with_layout_and_windows(Layout::default(), windows)
+		Self::with_layout_and_windows(CurrentLayout::default(), windows)
 	}
 
 	/// Creates a new AquariWM state struct with the given `layout` and `windows`.
-	pub fn with_layout_and_windows(layout: Layout, windows: impl IntoIterator<Item = (Window, MapState)>) -> Self {
+	pub fn with_layout_and_windows(
+		layout: CurrentLayout,
+		windows: impl IntoIterator<Item = (Window, MapState)>,
+	) -> Self {
 		let mut aquariwm = Self {
 			layout,
 			windows: HashMap::new(),
