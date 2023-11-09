@@ -2,244 +2,341 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use std::{env, io, thread};
+use std::{env, fmt::Debug, future::Future, io, thread};
 
+use futures::future;
+use thiserror::Error;
 use tracing::{event, span, Level};
-use xcb::x::{self as x11, Circulate, Cw as Attribute, EventMask, Place};
+use x11rb_async::{
+	self as x11rb,
+	connection::Connection,
+	protocol::{
+		xproto::{
+			self as x11,
+			ChangeWindowAttributesAux as Attributes,
+			ConnectionExt,
+			CreateNotifyEvent as CreateNotify,
+			DestroyNotifyEvent as DestroyNotify,
+			EventMask,
+			MapRequestEvent as MapRequest,
+			UnmapNotifyEvent as UnmapNotify,
+		},
+		Event,
+	},
+	rust_connection::RustConnection,
+};
 
-use crate::display_server::DisplayServer;
+use crate::{
+	display_server::{AsyncDisplayServer, DisplayServer},
+	layout,
+	state,
+};
 
+#[cfg(feature = "testing")]
+mod testing;
 mod util;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+	/// An error attempting to connect to the X server.
 	#[error(transparent)]
-	Xcb(#[from] xcb::Error),
+	Connect(#[from] x11rb::errors::ConnectError),
+	/// An error occurring from an active connection to an X server.
+	#[error(transparent)]
+	Connection(#[from] x11rb::errors::ConnectionError),
+	/// An error in a request's reply.
+	#[error(transparent)]
+	Reply(#[from] x11rb::errors::ReplyError),
+
+	/// There was an error parsing a [`x11::MapState`].
+	#[error("There was an error attempting to parse a MapState: {0}")]
+	MapStateParseError(#[from] ParseError<u8>),
 
 	#[error(transparent)]
 	Io(#[from] io::Error),
 }
 
-impl From<xcb::ProtocolError> for Error {
-	fn from(error: xcb::ProtocolError) -> Self {
-		Self::Xcb(error.into())
-	}
-}
-
-impl From<xcb::ConnError> for Error {
-	fn from(error: xcb::ConnError) -> Self {
-		Self::Xcb(error.into())
-	}
-}
-
 pub type Result<T, Err = Error> = std::result::Result<T, Err>;
+pub type ConnResult<T> = std::result::Result<T, x11rb::errors::ConnectionError>;
 
-#[cfg(feature = "testing")]
-mod testing {
-	use std::{process, sync::mpsc, time::Duration};
-
-	use winit::{
-		event::{Event as WinitEvent, WindowEvent as WinitWindowEvent},
-		event_loop::EventLoopBuilder as WinitEventLoopBuilder,
-		platform::x11::EventLoopBuilderExtX11,
-		window::WindowBuilder as WinitWindowBuilder,
-	};
-
-	use super::*;
-
-	pub struct Xephyr(pub process::Child);
-
-	impl Drop for Xephyr {
-		fn drop(&mut self) {
-			let Self(child) = self;
-
-			child.kill().expect("Failed to kill Xephyr");
-		}
-	}
-
-	impl Xephyr {
-		pub fn spawn() -> io::Result<Self> {
-			const TESTING_DISPLAY: &str = ":1";
-
-			let (transmitter, receiver) = mpsc::channel();
-
-			// Create and run a `winit` window for `Xephyr` to use in another thread so it doesn't block the
-			// main thread.
-			thread::spawn(move || {
-				event!(Level::DEBUG, "Initialising winit window");
-
-				let event_loop = WinitEventLoopBuilder::new().with_any_thread(true).build().unwrap();
-				let window = WinitWindowBuilder::new()
-					.with_title(X11::title())
-					.build(&event_loop)
-					.unwrap();
-
-				// Send the window's window ID back to the main thread so it can be supplied to `Xephyr`.
-				transmitter.send(u64::from(window.id())).unwrap();
-
-				event_loop
-					.run(move |event, target| match event {
-						// Close the window if requested.
-						WinitEvent::WindowEvent {
-							event: WinitWindowEvent::CloseRequested,
-							..
-						} => target.exit(),
-
-						_ => (),
-					})
-					.unwrap();
-			});
-			let window_id = receiver.recv().unwrap();
-
-			event!(Level::DEBUG, "Initialising Xephyr");
-			match process::Command::new("Xephyr")
-				.arg("-resizeable")
-				// Run `Xephyr` in the `winit` window.
-				.args(["-parent", &window_id.to_string()])
-				.arg(TESTING_DISPLAY)
-				.spawn()
-			{
-				Ok(process) => {
-					// Set the `DISPLAY` env variable to `TESTING_DISPLAY`.
-					env::set_var("DISPLAY", TESTING_DISPLAY);
-
-					// Sleep for 1s to wait for Xephyr to launch. Not ideal.
-					thread::sleep(Duration::from_secs(1));
-
-					Ok(Self(process))
-				},
-
-				Err(error) => {
-					event!(Level::ERROR, "Error while attempting to initialise Xephyr: {error}");
-
-					Err(error)
-				},
-			}
-		}
-	}
+pub struct X11 {
+	/// The connection to the X server.
+	pub conn: RustConnection,
+	/// The root window for the screen.
+	pub root: x11::Window,
 }
 
-#[cfg(not(feature = "testing"))]
-mod testing {
-	pub struct Xephyr;
-
-	impl Xephyr {
-		#[inline(always)]
-		pub fn spawn() -> io::Result<()> {
-			Ok(())
-		}
-	}
+impl AsyncDisplayServer for X11 {
+	type Error = Error;
 }
-
-pub struct X11;
 
 impl DisplayServer for X11 {
-	type Error = Error;
+	type Output = impl Future<Output = Result<(), Error>>;
 	const NAME: &'static str = "X11";
 
-	fn run(testing: bool) -> Result<()> {
-		let init_span = span!(Level::INFO, "Initialisation").entered();
+	fn run(testing: bool) -> Self::Output {
+		async move {
+			let init_span = span!(Level::INFO, "Initialisation").entered();
 
-		// Spawn Xephyr - a nested X server - if `testing` is enabled so AquariWM runs in a testing
-		// window. Keep it in scope so it can be killed when it is dropped.
-		let _process = testing.then_some(testing::Xephyr::spawn()?);
+			// Spawn Xephyr - a nested X server - if `testing` is enabled so AquariWM runs in a testing
+			// window. Keep it in scope so it can be killed when it is dropped.
+			#[cfg(feature = "testing")]
+			let _process = testing.then_some(testing::Xephyr::spawn()?);
 
-		// Connect to the X server.
-		let (connection, screen_num) = xcb::Connection::connect(None)?;
+			// Connect to the X server on the display specified by the `DISPLAY` env variable.
+			let (connection, screen_num, drive) = RustConnection::connect(None).await?;
 
-		// Get the setup and screen.
-		let setup = connection.get_setup();
-		let screen = setup.roots().nth(screen_num as usize).unwrap();
+			// Spawn a task that reads from the connection.
+			tokio::spawn(async move {
+				if let Err(error) = drive.await {
+					event!(Level::ERROR, "Error while driving the X11 connection: {}", error);
+				}
+			});
 
-		// The root window of the screen.
-		let root = screen.root();
+			// Get the setup and, with it, the screen.
+			let setup = connection.setup();
+			let screen = &setup.roots[screen_num];
+			// Get the root window of the screen.
+			let root = screen.root;
 
-		// Register for SUBSTRUCTURE_NOTIFY and SUBSTRUCTURE_REDIRECT events on the root window; this
-		// means registering as a window manager.
-		let cookie = connection.send_request_checked(&x11::ChangeWindowAttributes {
-			window: root,
-			value_list: &[Attribute::EventMask(
-				EventMask::SUBSTRUCTURE_NOTIFY | EventMask::SUBSTRUCTURE_REDIRECT,
-			)],
-		});
+			// Wrap the connection to provide easy access to utility methods.
+			let wm = Self { conn: connection, root };
 
-		match connection.check_request(cookie) {
-			Ok(_) => event!(Level::INFO, "Successfully registered window manager"),
+			// Attempt to register as a window manager.
+			match wm.register_window_manager().await {
+				Ok(_) => event!(Level::INFO, "Successfully registered window manager"),
 
-			// If we failed to register the window manager, exit the program.
-			Err(error) => {
-				event!(
-					Level::ERROR,
-					"Failed to register window manager; a window manager is already running!",
-				);
+				// If we failed to register the window manager, exit AquariWM.
+				Err(error) => {
+					event!(
+						Level::ERROR,
+						"Failed to register AquariWM as a window manager; another window manager is probably already \
+						 running:\n{}",
+						error
+					);
 
-				return Err(error.into());
-			},
-		}
-
-		if testing {
-			event!(Level::INFO, "Testing mode enabled");
-
-			// Attempt to launch a terminal.
-			match crate::launch_terminal() {
-				Ok((name, _)) => event!(Level::INFO, "Launched {name:?}"),
-				Err(error) => event!(Level::WARN, "Failed to launch terminal: {error}"),
+					return Err(error);
+				},
 			}
-		}
 
-		init_span.exit();
+			let mut state = state::AquariWm::with_windows(wm.query_windows().await?);
 
-		let event_loop_span = span!(Level::DEBUG, "Event loop");
+			if testing {
+				event!(Level::INFO, "Testing mode enabled");
 
-		// The window manager's event loop.
-		loop {
-			let _span = event_loop_span.enter();
+				// Attempt to launch a terminal.
+				match crate::launch_terminal() {
+					Ok((name, _)) => event!(Level::INFO, "Launched {name:?}"),
+					Err(error) => event!(Level::WARN, "Failed to launch terminal: {error}"),
+				}
+			}
 
-			// Flush requests sent in the previous iteration.
-			connection.flush()?;
+			init_span.exit();
+			let event_loop_span = span!(Level::DEBUG, "Event loop");
 
-			match connection.wait_for_event()? {
-				// X11 core protocol events.
-				xcb::Event::X(event) => match event {
-					// If a client requests to map its window, map it. For a tiling layout, this should
-					// place it in the tiling layout when mapping it.
-					x11::Event::MapRequest(request) => {
-						connection.send_request(&x11::MapWindow {
-							window: request.window(),
-						});
+			loop {
+				let _span = event_loop_span.enter();
+
+				// Flush the requests of the previous iteration, if there are any to flush.
+				wm.conn.flush().await?;
+
+				// Wait for the next event.
+				let event = wm.conn.wait_for_event().await?;
+				event!(Level::TRACE, "{:?}", event);
+
+				match event {
+					// Track the state of newly created windows.
+					Event::CreateNotify(CreateNotify { window, .. }) => {
+						state.add_window(window, state::MapState::Unmapped);
+					},
+					// Stop tracking the state of destroyed windows.
+					Event::DestroyNotify(DestroyNotify { window, .. }) => {
+						state.remove_window(&window);
+					},
+
+					// If a client requests to map its window, map it.
+					Event::MapRequest(MapRequest { window, .. }) => {
+						wm.conn.map_window(window);
+						state.map_window(&window);
 					},
 
 					// If a client requests to configure its window, honor it. For a tiling layout, this
 					// should modify the configure request to place it in the tiling layout.
-					x11::Event::ConfigureRequest(request) => {
-						connection.send_request(&x11::ConfigureWindow {
-							window: request.window(),
-							value_list: &util::value_list(&request),
-						});
+					Event::ConfigureRequest(request) => {
+						wm.honor_configure_window(&request).await?;
 					},
 
 					// If a client requests to raise or lower its window, honor it. For a tiling layout,
 					// this should be rejected for tiled windows, as they should always be at the bottom
 					// of the stack.
-					x11::Event::CirculateRequest(request) => {
-						util::circulate_window(
-							&connection,
-							request.window(),
-							match request.place() {
-								Place::OnTop => Circulate::RaiseLowest,
-								Place::OnBottom => Circulate::LowerHighest,
-							},
-						);
+					Event::CirculateRequest(request) => {
+						wm.circulate_window(&state, request.window, request.place).await?;
+					},
+					Event::UnmapNotify(UnmapNotify { window, .. }) => {
+						state.unmap_window(&window);
 					},
 
-					// TODO: for tiling layouts, remove the window from the layout.
-					x11::Event::UnmapNotify(_notification) => {},
-
 					_ => (),
-				},
-
-				_ => (),
+				}
 			}
+		}
+	}
+}
+
+impl X11 {
+	/// Circulates the given [floating] `window` in the given `direction`.
+	///
+	/// This function has no effect if the given `window` is not [floating].
+	///
+	/// [floating]: layout::Mode::Floating
+	pub async fn circulate_window<Direction>(
+		&self,
+		state: &state::AquariWm<x11::Window>,
+		window: x11::Window,
+		direction: Direction,
+	) -> Result<()>
+	where
+		Direction: TryInto<CirculateDirection>,
+		Direction::Error: Into<Error>,
+	{
+		// If it is a floating window...
+		if let Some(state::WindowState {
+			mode: layout::Mode::Floating,
+			..
+		}) = state.windows.get(&window)
+		{
+			let direction: CirculateDirection = direction.try_into().map_err(|error| error.into())?;
+
+			self.conn.circulate_window(direction.into(), window).await?;
+
+			// If we're moving the window to the bottom, then we have to move all the tiling windows
+			// below it.
+			if direction == CirculateDirection::MoveToBottom {
+				let tiled_windows = state
+					.windows
+					.iter()
+					.filter_map(|(window, state::WindowState { mode, .. })| match mode {
+						layout::Mode::Tiled => Some(window),
+
+						layout::Mode::Floating => None,
+					});
+
+				// Move each tiled window to the bottom of the window stack.
+				future::try_join_all(tiled_windows.map(|&window| {
+					self.conn
+						.circulate_window(CirculateDirection::MoveToBottom.into(), window)
+				}))
+				.await?;
+			}
+		}
+
+		Ok(())
+	}
+
+	/// Honors a [configure window request] without modifying it.
+	///
+	/// [configure window request]: x11::ConfigureRequestEvent
+	pub async fn honor_configure_window(&self, request: &x11::ConfigureRequestEvent) -> Result<()> {
+		self.conn
+			.configure_window(request.window, &util::ConfigureValues::from(request).into())
+			.await?;
+
+		Ok(())
+	}
+
+	/// Registers for the `SUBSTRUCTURE_NOTIFY` and `SUBSTRUCTURE_REDIRECT` event masks on the root
+	/// window; that is, register as a window manager.
+	async fn register_window_manager(&self) -> Result<()> {
+		let register_event_masks = self
+			.conn
+			.change_window_attributes(
+				self.root,
+				&Attributes::new().event_mask(EventMask::SUBSTRUCTURE_NOTIFY | EventMask::SUBSTRUCTURE_REDIRECT),
+			)
+			.await?;
+
+		register_event_masks.check().await?;
+		Ok(())
+	}
+
+	/// Queries the children of the `root` window and their [map states].
+	///
+	/// [map states]: state::MapState
+	async fn query_windows(&self) -> Result<Vec<(x11::Window, state::MapState)>> {
+		let windows = self.conn.query_tree(self.root).await?.reply().await?.children;
+
+		// Send GetWindowAttributes requests for each window.
+		let cookies =
+			future::try_join_all(windows.iter().map(|&window| self.conn.get_window_attributes(window))).await?;
+		let replies = future::try_join_all(cookies.into_iter().map(|cookie| cookie.reply())).await?;
+
+		let map_states = replies.into_iter().map(|reply| reply.map_state.try_into());
+
+		// Zip windows up with their map states.
+		Ok(windows
+			.into_iter()
+			.zip(map_states)
+			.map(|(window, map_state)| map_state.map(|map_state| (window, map_state)))
+			.try_collect()?)
+	}
+}
+
+#[derive(Debug, Error)]
+#[error("Failed to parse {value}")]
+pub struct ParseError<T: Debug> {
+	pub value: T,
+}
+
+impl TryFrom<x11::MapState> for state::MapState {
+	type Error = ParseError<u8>;
+
+	fn try_from(state: x11::MapState) -> std::result::Result<Self, Self::Error> {
+		match state {
+			x11::MapState::VIEWABLE | x11::MapState::UNVIEWABLE => Ok(state::MapState::Mapped),
+			x11::MapState::UNMAPPED => Ok(state::MapState::Unmapped),
+
+			other => Err(ParseError { value: u8::from(other) }),
+		}
+	}
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum CirculateDirection {
+	MoveToBottom,
+	MoveToTop,
+}
+
+impl TryFrom<x11::Circulate> for CirculateDirection {
+	type Error = ParseError<u8>;
+
+	fn try_from(direction: x11::Circulate) -> Result<Self, Self::Error> {
+		match direction {
+			x11::Circulate::LOWER_HIGHEST => Ok(Self::MoveToBottom),
+			x11::Circulate::RAISE_LOWEST => Ok(Self::MoveToTop),
+
+			other => Err(ParseError { value: other.into() }),
+		}
+	}
+}
+
+impl TryFrom<x11::Place> for CirculateDirection {
+	type Error = ParseError<u8>;
+
+	fn try_from(direction: x11::Place) -> Result<Self, Self::Error> {
+		match direction {
+			x11::Place::ON_BOTTOM => Ok(Self::MoveToBottom),
+			x11::Place::ON_TOP => Ok(Self::MoveToTop),
+
+			other => Err(ParseError { value: other.into() }),
+		}
+	}
+}
+
+impl From<CirculateDirection> for x11::Circulate {
+	fn from(direction: CirculateDirection) -> Self {
+		match direction {
+			CirculateDirection::MoveToBottom => Self::LOWER_HIGHEST,
+			CirculateDirection::MoveToTop => Self::RAISE_LOWEST,
 		}
 	}
 }

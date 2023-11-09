@@ -34,8 +34,8 @@ type Rectangle<N = i32, Space = LogicalSpace> = smithay::utils::Rectangle<N, Spa
 type Size<N = i32, Space = LogicalSpace> = smithay::utils::Size<N, Space>;
 type Point<N = i32, Space = LogicalSpace> = smithay::utils::Point<N, Space>;
 
-type PointerInnerHandle<'handle, State = state::AquariWm> = pointer::PointerInnerHandle<'handle, State>;
-type Focus<State = state::AquariWm, N = i32, Space = LogicalSpace> =
+type PointerInnerHandle<'handle, State = state::WaylandState> = pointer::PointerInnerHandle<'handle, State>;
+type Focus<State = state::WaylandState, N = i32, Space = LogicalSpace> =
 	(<State as SeatHandler>::PointerFocus, Point<N, Space>);
 
 bitflags! {
@@ -101,7 +101,7 @@ impl From<xdg_toplevel::ResizeEdge> for ResizeEdge {
 }
 
 pub struct ResizeSurfaceGrab {
-	start_data: pointer::GrabStartData<state::AquariWm>,
+	start_data: pointer::GrabStartData<state::WaylandState>,
 	window: Window,
 
 	edges: ResizeEdge,
@@ -163,7 +163,7 @@ impl ResizeSurfaceState {
 
 impl ResizeSurfaceGrab {
 	pub fn start(
-		start_data: pointer::GrabStartData<state::AquariWm>,
+		start_data: pointer::GrabStartData<state::WaylandState>,
 		window: Window,
 		edges: ResizeEdge,
 		initial_rectangle: Rectangle,
@@ -185,10 +185,10 @@ impl ResizeSurfaceGrab {
 	}
 }
 
-impl PointerGrab<state::AquariWm> for ResizeSurfaceGrab {
+impl PointerGrab<state::WaylandState> for ResizeSurfaceGrab {
 	fn motion(
 		&mut self,
-		state: &mut state::AquariWm,
+		state: &mut state::WaylandState,
 		handle: &mut PointerInnerHandle<'_>,
 		_focus: Option<Focus>,
 		event: &pointer::MotionEvent,
@@ -265,7 +265,7 @@ impl PointerGrab<state::AquariWm> for ResizeSurfaceGrab {
 
 	fn relative_motion(
 		&mut self,
-		state: &mut state::AquariWm,
+		state: &mut state::WaylandState,
 		handle: &mut PointerInnerHandle<'_>,
 		focus: Option<Focus>,
 		event: &pointer::RelativeMotionEvent,
@@ -275,7 +275,7 @@ impl PointerGrab<state::AquariWm> for ResizeSurfaceGrab {
 
 	fn button(
 		&mut self,
-		state: &mut state::AquariWm,
+		state: &mut state::WaylandState,
 		handle: &mut PointerInnerHandle<'_>,
 		event: &pointer::ButtonEvent,
 	) {
@@ -306,17 +306,22 @@ impl PointerGrab<state::AquariWm> for ResizeSurfaceGrab {
 		}
 	}
 
-	fn axis(&mut self, state: &mut state::AquariWm, handle: &mut PointerInnerHandle<'_>, details: pointer::AxisFrame) {
+	fn axis(
+		&mut self,
+		state: &mut state::WaylandState,
+		handle: &mut PointerInnerHandle<'_>,
+		details: pointer::AxisFrame,
+	) {
 		handle.axis(state, details);
 	}
 
-	fn frame(&mut self, state: &mut state::AquariWm, handle: &mut PointerInnerHandle<'_>) {
+	fn frame(&mut self, state: &mut state::WaylandState, handle: &mut PointerInnerHandle<'_>) {
 		handle.frame(state);
 	}
 
 	fn gesture_swipe_begin(
 		&mut self,
-		state: &mut state::AquariWm,
+		state: &mut state::WaylandState,
 		handle: &mut PointerInnerHandle<'_>,
 		event: &GestureSwipeBeginEvent,
 	) {
@@ -325,7 +330,7 @@ impl PointerGrab<state::AquariWm> for ResizeSurfaceGrab {
 
 	fn gesture_swipe_update(
 		&mut self,
-		state: &mut state::AquariWm,
+		state: &mut state::WaylandState,
 		handle: &mut PointerInnerHandle<'_>,
 		event: &GestureSwipeUpdateEvent,
 	) {
@@ -334,7 +339,7 @@ impl PointerGrab<state::AquariWm> for ResizeSurfaceGrab {
 
 	fn gesture_swipe_end(
 		&mut self,
-		state: &mut state::AquariWm,
+		state: &mut state::WaylandState,
 		handle: &mut PointerInnerHandle<'_>,
 		event: &GestureSwipeEndEvent,
 	) {
@@ -343,7 +348,7 @@ impl PointerGrab<state::AquariWm> for ResizeSurfaceGrab {
 
 	fn gesture_pinch_begin(
 		&mut self,
-		state: &mut state::AquariWm,
+		state: &mut state::WaylandState,
 		handle: &mut PointerInnerHandle<'_>,
 		event: &GesturePinchBeginEvent,
 	) {
@@ -352,7 +357,7 @@ impl PointerGrab<state::AquariWm> for ResizeSurfaceGrab {
 
 	fn gesture_pinch_update(
 		&mut self,
-		state: &mut state::AquariWm,
+		state: &mut state::WaylandState,
 		handle: &mut PointerInnerHandle<'_>,
 		event: &GesturePinchUpdateEvent,
 	) {
@@ -361,7 +366,7 @@ impl PointerGrab<state::AquariWm> for ResizeSurfaceGrab {
 
 	fn gesture_pinch_end(
 		&mut self,
-		state: &mut state::AquariWm,
+		state: &mut state::WaylandState,
 		handle: &mut PointerInnerHandle<'_>,
 		event: &GesturePinchEndEvent,
 	) {
@@ -370,7 +375,7 @@ impl PointerGrab<state::AquariWm> for ResizeSurfaceGrab {
 
 	fn gesture_hold_begin(
 		&mut self,
-		state: &mut state::AquariWm,
+		state: &mut state::WaylandState,
 		handle: &mut PointerInnerHandle<'_>,
 		event: &GestureHoldBeginEvent,
 	) {
@@ -379,14 +384,14 @@ impl PointerGrab<state::AquariWm> for ResizeSurfaceGrab {
 
 	fn gesture_hold_end(
 		&mut self,
-		state: &mut state::AquariWm,
+		state: &mut state::WaylandState,
 		handle: &mut PointerInnerHandle<'_>,
 		event: &GestureHoldEndEvent,
 	) {
 		handle.gesture_hold_end(state, event);
 	}
 
-	fn start_data(&self) -> &pointer::GrabStartData<state::AquariWm> {
+	fn start_data(&self) -> &pointer::GrabStartData<state::WaylandState> {
 		&self.start_data
 	}
 }

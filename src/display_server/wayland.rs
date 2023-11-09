@@ -24,7 +24,7 @@ use smithay::{
 use thiserror::Error;
 use tracing::{event, span, Level};
 
-use crate::display_server::DisplayServer;
+use crate::display_server::{DisplayServer, SyncDisplayServer};
 
 pub mod grabs;
 mod input;
@@ -54,18 +54,22 @@ pub enum Error {
 
 pub struct Wayland;
 
-impl DisplayServer for Wayland {
+impl SyncDisplayServer for Wayland {
 	type Error = Error;
+}
+
+impl DisplayServer for Wayland {
+	type Output = Result<(), Error>;
 	const NAME: &'static str = "Wayland";
 
-	fn run(testing: bool) -> Result<(), Self::Error> {
+	fn run(testing: bool) -> Result<(), Error> {
 		// Log initialisation.
 		let init_span = span!(Level::INFO, "Initialising").entered();
 
 		// Create an event loop for the compositor to run with.
-		let mut event_loop = <EventLoop<state::AquariWm>>::try_new()?;
+		let mut event_loop = <EventLoop<state::WaylandState>>::try_new()?;
 		// Initialise the AquariWM state.
-		let mut state = state::AquariWm::new(Display::new()?, &mut event_loop);
+		let mut state = state::WaylandState::new(Display::new()?, &mut event_loop);
 
 		// Init winit for testing if the testing feature is enabled.
 		#[cfg(feature = "testing")]
@@ -82,7 +86,7 @@ impl DisplayServer for Wayland {
 		// End the initialisation span.
 		init_span.exit();
 
-		event_loop.run(None, &mut state, move |_| {})?;
+		event_loop.run(None, &mut state, move |state| {})?;
 
 		Ok(())
 	}
@@ -90,7 +94,10 @@ impl DisplayServer for Wayland {
 
 impl Wayland {
 	#[cfg(feature = "testing")]
-	pub fn init_winit(event_loop: &mut EventLoop<state::AquariWm>, state: &mut state::AquariWm) -> Result<(), Error> {
+	pub fn init_winit(
+		event_loop: &mut EventLoop<state::WaylandState>,
+		state: &mut state::WaylandState,
+	) -> Result<(), Error> {
 		let _span = span!(Level::DEBUG, "Initialising winit").entered();
 
 		// Initialise winit.
@@ -120,7 +127,7 @@ impl Wayland {
 				model: format!("({})", Self::NAME),
 			},
 		);
-		output.create_global::<state::AquariWm>(&mut state.display_handle);
+		output.create_global::<state::WaylandState>(&mut state.display_handle);
 
 		output.change_current_state(
 			Some(output_mode),
@@ -146,7 +153,7 @@ impl Wayland {
 		event_loop
 			.handle()
 			.insert_source(winit, move |event, _, state| {
-				let state::AquariWm {
+				let state::WaylandState {
 					display_handle,
 					popup_manager,
 					space,

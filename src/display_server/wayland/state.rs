@@ -12,7 +12,7 @@ use smithay::{
 	delegate_seat,
 	delegate_shm,
 	delegate_xdg_shell,
-	desktop::{PopupKind, PopupManager, Space, Window, WindowSurfaceType},
+	desktop::{self as wl, PopupKind, PopupManager, Space, WindowSurfaceType},
 	input::{keyboard::XkbConfig, pointer, pointer::CursorImageStatus, Seat, SeatHandler, SeatState},
 	reexports::{
 		calloop,
@@ -42,23 +42,27 @@ use smithay::{
 			},
 			SelectionHandler,
 		},
-		shell::xdg::{PopupSurface, PositionerState, ToplevelSurface, XdgShellHandler, XdgShellState},
+		shell::xdg::{self, PositionerState, ToplevelSurface, XdgShellHandler, XdgShellState},
 		shm::{ShmHandler, ShmState},
 		socket::ListeningSocketSource,
 	},
 };
 
 use super::grabs::{move_grab::MoveSurfaceGrab, resize_grab::ResizeSurfaceGrab};
+use crate::state::MapState;
 
 type Point<N = i32, Space = LogicalSpace> = smithay::utils::Point<N, Space>;
 
-pub struct AquariWm {
+pub struct WaylandState {
 	pub start_time: time::Instant,
 	pub socket_name: OsString,
 	pub display_handle: DisplayHandle,
 
-	pub space: Space<Window>,
+	pub space: Space<wl::Window>,
 	pub loop_signal: LoopSignal,
+
+	// AquariWM state.
+	pub aquariwm_state: crate::state::AquariWm<wl::Window>,
 
 	// Smithay state.
 	pub compositor_state: CompositorState,
@@ -74,7 +78,7 @@ pub struct AquariWm {
 }
 
 // Seat impls {{{
-impl SeatHandler for AquariWm {
+impl SeatHandler for WaylandState {
 	type KeyboardFocus = WlSurface;
 	type PointerFocus = WlSurface;
 
@@ -92,41 +96,47 @@ impl SeatHandler for AquariWm {
 	fn cursor_image(&mut self, _seat: &Seat<Self>, _image: CursorImageStatus) {}
 }
 
-delegate_seat!(AquariWm);
+delegate_seat!(WaylandState);
 // }}}
 
 // Data device impls {{{
-impl SelectionHandler for AquariWm {
+impl SelectionHandler for WaylandState {
 	type SelectionUserData = ();
 }
 
-impl DataDeviceHandler for AquariWm {
+impl DataDeviceHandler for WaylandState {
 	fn data_device_state(&self) -> &DataDeviceState {
 		&self.data_device_state
 	}
 }
 
-impl ClientDndGrabHandler for AquariWm {}
-impl ServerDndGrabHandler for AquariWm {}
+impl ClientDndGrabHandler for WaylandState {}
 
-delegate_data_device!(AquariWm);
+impl ServerDndGrabHandler for WaylandState {}
+
+delegate_data_device!(WaylandState);
 // }}}
 
 // Output impl
-delegate_output!(AquariWm);
+delegate_output!(WaylandState);
 
 // XDG shell impls {{{
-impl XdgShellHandler for AquariWm {
+impl XdgShellHandler for WaylandState {
 	fn xdg_shell_state(&mut self) -> &mut XdgShellState {
 		&mut self.xdg_shell_state
 	}
 
 	fn new_toplevel(&mut self, surface: ToplevelSurface) {
-		let window = Window::new(surface);
+		let window = wl::Window::new(surface);
+		// Track the window.
+		self.aquariwm_state.add_window(window.clone(), MapState::Mapped);
+
 		self.space.map_element(window, (0, 0), false);
+
+		// TODO: configure window
 	}
 
-	fn new_popup(&mut self, surface: PopupSurface, _positioner: PositionerState) {
+	fn new_popup(&mut self, surface: xdg::PopupSurface, _positioner: PositionerState) {
 		let _ = self.popup_manager.track_popup(PopupKind::Xdg(surface));
 	}
 
@@ -195,11 +205,11 @@ impl XdgShellHandler for AquariWm {
 		}
 	}
 
-	fn grab(&mut self, _surface: PopupSurface, _seat: WlSeat, _serial: Serial) {
+	fn grab(&mut self, _surface: xdg::PopupSurface, _seat: WlSeat, _serial: Serial) {
 		// TODO: popup grabs
 	}
 
-	fn reposition_request(&mut self, surface: PopupSurface, positioner: PositionerState, token: u32) {
+	fn reposition_request(&mut self, surface: xdg::PopupSurface, positioner: PositionerState, token: u32) {
 		surface.with_pending_state(|state| {
 			// We should be calculating the geometry here, not using the default implementation, as it does not
 			// take the window position and output constraints into account.
@@ -212,9 +222,13 @@ impl XdgShellHandler for AquariWm {
 	}
 }
 
-delegate_xdg_shell!(AquariWm);
+delegate_xdg_shell!(WaylandState);
 
-fn check_grab(seat: &Seat<AquariWm>, surface: &WlSurface, serial: Serial) -> Option<pointer::GrabStartData<AquariWm>> {
+fn check_grab(
+	seat: &Seat<WaylandState>,
+	surface: &WlSurface,
+	serial: Serial,
+) -> Option<pointer::GrabStartData<WaylandState>> {
 	let pointer = seat.get_pointer()?;
 
 	// If this surface has a pointer grab...
@@ -233,7 +247,7 @@ fn check_grab(seat: &Seat<AquariWm>, surface: &WlSurface, serial: Serial) -> Opt
 // }}}
 
 // Compositor impls {{{
-impl CompositorHandler for AquariWm {
+impl CompositorHandler for WaylandState {
 	fn compositor_state(&mut self) -> &mut CompositorState {
 		&mut self.compositor_state
 	}
@@ -263,21 +277,21 @@ impl CompositorHandler for AquariWm {
 	}
 }
 
-impl BufferHandler for AquariWm {
+impl BufferHandler for WaylandState {
 	fn buffer_destroyed(&mut self, _buffer: &WlBuffer) {}
 }
 
-impl ShmHandler for AquariWm {
+impl ShmHandler for WaylandState {
 	fn shm_state(&self) -> &ShmState {
 		&self.shm_state
 	}
 }
 
-delegate_compositor!(AquariWm);
-delegate_shm!(AquariWm);
+delegate_compositor!(WaylandState);
+delegate_shm!(WaylandState);
 // }}}
 
-impl AquariWm {
+impl WaylandState {
 	pub fn new(display: Display<Self>, event_loop: &mut EventLoop<Self>) -> Self {
 		let start_time = time::Instant::now();
 		let display_handle = display.handle();
@@ -304,6 +318,8 @@ impl AquariWm {
 			// A two-dimensional plane on which outputs and windows can be mapped.
 			space: Space::default(),
 			loop_signal: event_loop.get_signal(),
+
+			aquariwm_state: crate::state::AquariWm::new(),
 
 			// A whole bunch of Smithay-related state.
 			compositor_state: CompositorState::new::<Self>(&display_handle),
