@@ -28,6 +28,7 @@ use x11rb_async::{
 
 use crate::{
 	display_server::{AsyncDisplayServer, DisplayServer},
+	layout,
 	state,
 };
 
@@ -161,15 +162,16 @@ impl DisplayServer for X11 {
 
 					// If a client requests to configure its window, honor it. For a tiling layout, this
 					// should modify the configure request to place it in the tiling layout.
-					Event::ConfigureRequest(request) => wm.honor_configure_window(&request).await?,
+					Event::ConfigureRequest(request) => {
+						wm.honor_configure_window(&request).await?;
+					},
 
 					// If a client requests to raise or lower its window, honor it. For a tiling layout,
 					// this should be rejected for tiled windows, as they should always be at the bottom
 					// of the stack.
-					Event::CirculateRequest(_request) => {
-						// TODO
+					Event::CirculateRequest(request) => {
+						wm.circulate_window(&state, request.window, request.place).await?;
 					},
-
 					Event::UnmapNotify(UnmapNotify { window, .. }) => {
 						state.unmap_window(&window);
 					},
@@ -182,10 +184,59 @@ impl DisplayServer for X11 {
 }
 
 impl X11 {
+	/// Circulates the given [floating] `window` in the given `direction`.
+	///
+	/// This function has no effect if the given `window` is not [floating].
+	///
+	/// [floating]: layout::Mode::Floating
+	pub async fn circulate_window<Direction>(
+		&self,
+		state: &state::AquariWm<x11::Window>,
+		window: x11::Window,
+		direction: Direction,
+	) -> Result<()>
+	where
+		Direction: TryInto<CirculateDirection>,
+		Direction::Error: Into<Error>,
+	{
+		// If it is a floating window...
+		if let Some(state::WindowState {
+			mode: layout::Mode::Floating,
+			..
+		}) = state.windows.get(&window)
+		{
+			let direction: CirculateDirection = direction.try_into().map_err(|error| error.into())?;
+
+			self.conn.circulate_window(direction.into(), window).await?;
+
+			// If we're moving the window to the bottom, then we have to move all the tiling windows
+			// below it.
+			if direction == CirculateDirection::MoveToBottom {
+				let tiled_windows = state
+					.windows
+					.iter()
+					.filter_map(|(window, state::WindowState { mode, .. })| match mode {
+						layout::Mode::Tiled => Some(window),
+
+						layout::Mode::Floating => None,
+					});
+
+				// Move each tiled window to the bottom of the window stack.
+				future::try_join_all(tiled_windows.map(|&window| {
+					self.conn
+						.circulate_window(CirculateDirection::MoveToBottom.into(), window)
+				}))
+				.await?;
+			}
+		}
+
+		Ok(())
+	}
+
 	/// Honors a [configure window request] without modifying it.
 	///
 	/// [configure window request]: x11::ConfigureRequestEvent
-	async fn honor_configure_window(&self, request: &x11::ConfigureRequestEvent) -> Result<()> {
+	pub async fn honor_configure_window(&self, request: &x11::ConfigureRequestEvent) -> Result<()> {
 		self.conn
 			.configure_window(request.window, &util::ConfigureValues::from(request).into())
 			.await?;
@@ -245,6 +296,47 @@ impl TryFrom<x11::MapState> for state::MapState {
 			x11::MapState::UNMAPPED => Ok(state::MapState::Unmapped),
 
 			other => Err(ParseError { value: u8::from(other) }),
+		}
+	}
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum CirculateDirection {
+	MoveToBottom,
+	MoveToTop,
+}
+
+impl TryFrom<x11::Circulate> for CirculateDirection {
+	type Error = ParseError<u8>;
+
+	fn try_from(direction: x11::Circulate) -> Result<Self, Self::Error> {
+		match direction {
+			x11::Circulate::LOWER_HIGHEST => Ok(Self::MoveToBottom),
+			x11::Circulate::RAISE_LOWEST => Ok(Self::MoveToTop),
+
+			other => Err(ParseError { value: other.into() }),
+		}
+	}
+}
+
+impl TryFrom<x11::Place> for CirculateDirection {
+	type Error = ParseError<u8>;
+
+	fn try_from(direction: x11::Place) -> Result<Self, Self::Error> {
+		match direction {
+			x11::Place::ON_BOTTOM => Ok(Self::MoveToBottom),
+			x11::Place::ON_TOP => Ok(Self::MoveToTop),
+
+			other => Err(ParseError { value: other.into() }),
+		}
+	}
+}
+
+impl From<CirculateDirection> for x11::Circulate {
+	fn from(direction: CirculateDirection) -> Self {
+		match direction {
+			CirculateDirection::MoveToBottom => Self::LOWER_HIGHEST,
+			CirculateDirection::MoveToTop => Self::RAISE_LOWEST,
 		}
 	}
 }
