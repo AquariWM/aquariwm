@@ -51,6 +51,11 @@ pub enum Error {
 	/// There was an error parsing a [`x11::MapState`].
 	#[error("There was an error attempting to parse a MapState: {0}")]
 	MapStateParseError(#[from] ParseError<u8>),
+	/// The window provided to [`X11::circulate_window`] was not a [floating] window.
+	///
+	/// [floating]: layout::Mode::Floating
+	#[error("The given window ({0}) is tiled, not floating")]
+	NonFloatingWindow(x11::Window),
 
 	#[error(transparent)]
 	Io(#[from] io::Error),
@@ -186,9 +191,17 @@ impl DisplayServer for X11 {
 impl X11 {
 	/// Circulates the given [floating] `window` in the given `direction`.
 	///
-	/// This function has no effect if the given `window` is not [floating].
+	/// # Errors
+	/// If the given `window` is not [floating], a [`NonFloatingWindow` error] will be returned.
+	/// This is because tiled windows are always meant to be at the bottom of the window stack, and
+	/// tiled windows are non-overlapping: their order in the window stack does not matter.
+	///
+	/// # Panics
+	/// If the given `window` is not tracked by the given window manager `state`, this function will
+	/// panic. This shouldn't happen if the window comes from the X server.
 	///
 	/// [floating]: layout::Mode::Floating
+	/// [`NonFloatingWindow` error]: CirculateWindowError::NonFloatingWindow
 	pub async fn circulate_window<Direction>(
 		&self,
 		state: &state::AquariWm<x11::Window>,
@@ -199,38 +212,49 @@ impl X11 {
 		Direction: TryInto<CirculateDirection>,
 		Direction::Error: Into<Error>,
 	{
-		// If it is a floating window...
-		if let Some(state::WindowState {
-			mode: layout::Mode::Floating,
-			..
-		}) = state.windows.get(&window)
-		{
-			let direction: CirculateDirection = direction.try_into().map_err(|error| error.into())?;
+		match state.windows.get(&window) {
+			// If it is a floating window...
+			Some(state::WindowState {
+				mode: layout::Mode::Floating,
+				..
+			}) => {
+				let direction: CirculateDirection = direction.try_into().map_err(|error| error.into())?;
 
-			self.conn.circulate_window(direction.into(), window).await?;
+				self.conn
+					.circulate_window(direction.into(), window)
+					.await
+					.map_err(Error::from)?;
 
-			// If we're moving the window to the bottom, then we have to move all the tiling windows
-			// below it.
-			if direction == CirculateDirection::MoveToBottom {
-				let tiled_windows = state
-					.windows
-					.iter()
-					.filter_map(|(window, state::WindowState { mode, .. })| match mode {
-						layout::Mode::Tiled => Some(window),
+				// If we're moving the window to the bottom, then we have to move all the tiling windows
+				// below it.
+				if direction == CirculateDirection::MoveToBottom {
+					let tiled_windows = state
+						.windows
+						.iter()
+						.filter_map(|(window, state::WindowState { mode, .. })| match mode {
+							layout::Mode::Tiled => Some(window),
 
-						layout::Mode::Floating => None,
-					});
+							layout::Mode::Floating => None,
+						});
 
-				// Move each tiled window to the bottom of the window stack.
-				future::try_join_all(tiled_windows.map(|&window| {
-					self.conn
-						.circulate_window(CirculateDirection::MoveToBottom.into(), window)
-				}))
-				.await?;
-			}
+					// Move each tiled window to the bottom of the window stack.
+					future::try_join_all(tiled_windows.map(|&window| {
+						self.conn
+							.circulate_window(CirculateDirection::MoveToBottom.into(), window)
+					}))
+					.await
+					.map_err(Error::from)?;
+				}
+
+				Ok(())
+			},
+
+			// If it isn't a floating window...
+			Some(_) => Err(Error::NonFloatingWindow(window)),
+
+			// If the window manager is not tracking the window, panic.
+			None => panic!("attempted to circulate a window which the window manager doesn't know about"),
 		}
-
-		Ok(())
 	}
 
 	/// Honors a [configure window request] without modifying it.

@@ -65,6 +65,16 @@ impl<'values> From<&'values ConfigureValues> for x11::ConfigureWindowAux {
 
 impl From<ConfigureValues> for x11::ConfigureWindowAux {
 	fn from(values: ConfigureValues) -> Self {
-		(&values).into()
+		Self {
+			x: values.x.map(Into::into),
+			y: values.y.map(Into::into),
+
+			width: values.width.map(Into::into),
+			height: values.height.map(Into::into),
+
+			border_width: values.border_width.map(Into::into),
+			sibling: values.sibling,
+			stack_mode: values.stack_mode,
+		}
 	}
 }
