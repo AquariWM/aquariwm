@@ -11,6 +11,11 @@ use std::fmt::Debug;
 /// [layout]: self
 mod implementations;
 
+/// Default [layout managers] that come with AquariWM.
+///
+/// [layout managers]: TilingLayoutManager
+mod managers;
+
 /// Whether a window is [`Tiled`] or [`Floating`].
 ///
 /// [`Tiled`]: Mode::Tiled
@@ -32,10 +37,7 @@ pub enum Mode {
 #[derive(Default)]
 pub enum CurrentLayout<Window> {
 	/// AquariWM is currently using a tiling layout.
-	Tiled {
-		layout: TilingLayout<Window>,
-		layout_manager: Box<dyn TilingLayoutManager<Window>>,
-	},
+	Tiled(Box<dyn TilingLayoutManager<Window>>),
 
 	/// AquariWM is not currently using a tiling layout.
 	#[default]
@@ -48,7 +50,9 @@ pub enum CurrentLayout<Window> {
 ///
 /// [tiled]: Mode::Tiled
 /// [layout manager]: TilingLayoutManager
-pub struct TilingLayout<Window>(GroupNode<Window>);
+pub struct TilingLayout<Window> {
+	root: GroupNode<Window>,
+}
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Orientation {
@@ -101,16 +105,69 @@ pub enum Axis {
 /// [window]: Window
 pub enum Node<Window> {
 	Group(GroupNode<Window>),
-	Window(Window),
+	Window(WindowNode<Window>),
 }
 
-/// Represent a group of [nodes] in a [layout] tree.
+/// Represents a group of [nodes] in a [layout] tree.
 ///
 /// [nodes]: Node
 /// [layout]: TilingLayout
 pub struct GroupNode<Window> {
 	orientation: Orientation,
+
 	nodes: Vec<Node<Window>>,
+	/// The total size of all nodes along the [axis] of the group.
+	total_node_size: u32,
+
+	/// Additions to `nodes` made by the [layout manager] in the latest [`add_window`] or
+	/// [`remove_window`] call.
+	///
+	/// This is a sorted list of indexes.
+	///
+	/// Additions are tracked so that nodes can be resized afterwards. This prevents multiple
+	/// resizings per node, which is particularly important when it comes to the resized windows.
+	///
+	/// [layout manager]: TilingLayoutManager
+	///
+	/// [`add_window`]: TilingLayoutManager::add_window
+	/// [`remove_window`]: TilingLayoutManager::remove_window
+	additions: Vec<usize>,
+	total_removed_size: u32,
+	/// Whether the [`axis`] of the group's `orientation` was changed by the [layout manager] in the
+	/// latest [`add_window`] or [`remove_window`] called.
+	///
+	/// [`axis`]: Orientation::axis
+	///
+	/// [`add_window`]: TilingLayoutManager::add_window
+	/// [`remove_window`]: TilingLayoutManager::remove_window
+	axis_changed: bool,
+
+	width: u32,
+	height: u32,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+enum NodeChange {
+	/// A node was inserted at the wrapped `index`.
+	Addition { index: usize },
+	/// A node was removed at the wrapped `index` that had the wrapped `size`.
+	///
+	/// `size` refers to the dimension of the node that is aligned with the group's [axis]. It is
+	/// the dimension that changes when the node is resized; the other dimension changes only when
+	/// this group is resized in the same other dimension.
+	///
+	/// [axis]: Axis
+	Deletion { index: usize, size: u32 },
+}
+
+/// Represents a [node] containing a window.
+///
+/// [node]: Node
+pub struct WindowNode<Window> {
+	window: Window,
+
+	width: u32,
+	height: u32,
 }
 
 /// Manages a [tiling layout], restructuring the layout when a window needs to be [added] or
@@ -119,31 +176,13 @@ pub struct GroupNode<Window> {
 /// `Window` is the type used to represent windows. It is a generic type parameter because different
 /// display server implementations use different window types.
 ///
-/// # Implementors notes
-/// This trait should be implemented for all possible window types so that it works on all AquariWM
-/// display server implementations.
-/// ```
-/// # struct MyLayoutManager<Window>;
-/// #
-/// unsafe impl<Window> TilingLayoutManager<Window>
-///     for MyLayoutManager<Window> {
-///     // ...
-/// #     fn init(
-/// #         layout: &mut TilingLayout<Window>,
-/// #         windows: impl IntoIterator<Item = Window>,
-/// #     ) -> Self {
-/// #         Self
-/// #     }
-/// #
-/// #     fn add_window(window: Window) {}
-/// #
-/// #     fn remove_window(window: &Window) {}
-/// }
-/// ```
-///
-/// ## Safety
+/// # Safety
 /// This is an unsafe trait because implementors must uphold guarantees regarding windows being
 /// added to and removed from the layout:
+/// - [`layout`] *must* return a shared reference to the [`TilingLayout`] managed by the layout
+///   manager.
+/// - [`layout_mut`] *must* return a mutable reference to the [`TilingLayout`] managed by the layout
+///   manager.
 /// - If [`add_window`] is called, that `window` *must* be added to the layout.
 /// - If [`remove_window`] is called, that `window` *must* be removed from the layout.
 /// - Windows *must only* be added to the layout as a result of [`add_window`] being called with
@@ -153,6 +192,33 @@ pub struct GroupNode<Window> {
 ///
 /// Windows *may* be removed and then added back to the layout in the implementations of
 /// [`add_window`] and [`remove_window`] to restructure the layout.
+///
+/// # Implementation notes
+/// This trait should be implemented for all possible window types so that it works on all AquariWM
+/// display server implementations.
+/// ```
+/// # struct MyLayoutManager<Window>;
+/// #
+/// unsafe impl<Window> TilingLayoutManager<Window>
+///     for MyLayoutManager<Window> {
+///     // ...
+/// #     const ORIENTATION: Orientation = Orientation::LeftToRight;
+/// #
+/// #     fn init(
+/// #         layout: TilingLayout<Window>,
+/// #         windows: impl IntoIterator<Item = Window>,
+/// #     ) -> Self {
+/// #         Self
+/// #     }
+/// #
+/// #     fn layout(&self) -> &TilingLayout<Window> { unimplemented!() }
+/// #     fn layout_mut(&self) -> &mut TilingLayout<Window> { unimplemented!() }
+/// #
+/// #     fn add_window(&mut self, window: Window) {}
+/// #
+/// #     fn remove_window(&mut self, window: &Window) {}
+/// }
+/// ```
 ///
 /// [tiling layout]: TilingLayout
 ///
@@ -167,19 +233,40 @@ pub unsafe trait TilingLayoutManager<Window>: Send + Sync {
 	/// [orientation]: Orientation
 	const ORIENTATION: Orientation;
 
-	fn init(layout: &mut TilingLayout<Window>, windows: impl IntoIterator<Item = Window>) -> Self;
+	fn init<WindowsIter>(layout: TilingLayout<Window>, windows: WindowsIter) -> Self
+	where
+		WindowsIter: IntoIterator<Item = Window>,
+		WindowsIter: ExactSizeIterator;
+
+	/// Returns a shared reference to the [layout] managed by the layout manager.
+	///
+	/// [layout]: TilingLayout
+	fn layout(&self) -> &TilingLayout<Window>;
+
+	/// Returns a mutable reference to the [layout] managed by the layout manager.
+	///
+	/// [layout]: TilingLayout
+	fn layout_mut(&mut self) -> &mut TilingLayout<Window>;
 
 	/// Add the given `window` to the layout.
 	///
-	/// # Implementor notes
+	/// # Implementation notes
 	/// The `window` *must* be added to the layout somewhere. The layout *may* be restructured in
 	/// response to the new node being added to the layout.
-	fn add_window(window: Window);
+	///
+	/// See the [trait documentation] for more information.
+	///
+	/// [trait documentation]: Self
+	fn add_window(&mut self, window: Window);
 
 	/// Remove the given `window` from the layout.
 	///
-	/// # Implementor notes
+	/// # Implementation notes
 	/// The `window` *must* be removed from the layout. The layout *may* be restructured in response
 	/// to that node being removed from the layout.
-	fn remove_window(window: &Window);
+	///
+	/// See the [trait documentation] for more information.
+	///
+	/// [trait documentation]: Self
+	fn remove_window(&mut self, window: &Window);
 }
