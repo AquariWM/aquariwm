@@ -20,5 +20,5 @@ compositor (window managers and compositors being provided by external clients b
 
 At the time of writing (November 2023), AquariWM development is in early stages, with the basics of a running X11 window
 manager and Wayland compositor achieved. Work is focused on implementing the tiling layout manager design, starting with
-simply using traits for layout managers, with the goal of transitioning to use a custom protocol in the future, the
-specifics of which are yet to be decided.
+simply using traits for layout managers, with the goal of transitioning to use a custom protocol in the future (the
+specifics of which are yet to be decided).
