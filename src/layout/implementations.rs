@@ -159,7 +159,10 @@ impl<Window> GroupNode<Window> {
 
 			additions: Vec::new(),
 			total_removed_primary: 0,
+
 			new_orientation: None,
+			new_width: None,
+			new_height: None,
 
 			width,
 			height,
@@ -167,16 +170,38 @@ impl<Window> GroupNode<Window> {
 	}
 
 	pub(crate) fn primary(&self) -> u32 {
-		match self.orientation.axis() {
+		match self.orientation().axis() {
 			Axis::Horizontal => self.width,
 			Axis::Vertical => self.height,
 		}
 	}
 
 	pub(crate) fn secondary(&self) -> u32 {
-		match self.orientation.axis() {
+		match self.orientation().axis() {
 			Axis::Horizontal => self.height,
 			Axis::Vertical => self.width,
+		}
+	}
+
+	pub(crate) fn set_width(&mut self, width: u32) {
+		self.new_width = Some(width);
+	}
+
+	pub(crate) fn set_height(&mut self, height: u32) {
+		self.new_height = Some(height);
+	}
+
+	pub(crate) fn set_primary(&mut self, primary: u32) {
+		match self.orientation().axis() {
+			Axis::Horizontal => self.set_width(primary),
+			Axis::Vertical => self.set_height(primary),
+		}
+	}
+
+	pub(crate) fn set_secondary(&mut self, secondary: u32) {
+		match self.orientation().axis() {
+			Axis::Horizontal => self.set_height(secondary),
+			Axis::Vertical => self.set_width(secondary),
 		}
 	}
 }

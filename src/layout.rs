@@ -133,6 +133,7 @@ pub struct GroupNode<Window> {
 	/// [`remove_window`]: TilingLayoutManager::remove_window
 	additions: Vec<usize>,
 	total_removed_primary: u32,
+
 	/// The new [`orientation`] for the group set by the [layout manager] in the latest
 	/// [`add_window`] or [`remove_window`] call.
 	///
@@ -142,6 +143,8 @@ pub struct GroupNode<Window> {
 	/// [`add_window`]: TilingLayoutManager::add_window
 	/// [`remove_window`]: TilingLayoutManager::remove_window
 	new_orientation: Option<Orientation>,
+	new_width: Option<u32>,
+	new_height: Option<u32>,
 
 	width: u32,
 	height: u32,
@@ -215,15 +218,16 @@ pub struct WindowNode<Window> {
 /// [removed]: Self::remove_window
 /// [`remove_window`]: Self::remove_window
 pub unsafe trait TilingLayoutManager<Window>: Send + Sync {
-	/// The default [orientation] for layouts created with this layout manager.
-	///
-	/// [orientation]: Orientation
-	const ORIENTATION: Orientation;
+	// FIXME: can't have consts in traits that are able to be trait objects
+	// /// The default [orientation] for layouts created with this layout manager.
+	// ///
+	// /// [orientation]: Orientation
+	// const ORIENTATION: Orientation;
 
 	fn init<WindowsIter>(layout: TilingLayout<Window>, windows: WindowsIter) -> Self
 	where
-		WindowsIter: IntoIterator<Item = Window>,
-		WindowsIter: ExactSizeIterator;
+		Self: Sized,
+		WindowsIter: IntoIterator<Item = Window> + ExactSizeIterator;
 
 	/// Returns a shared reference to the [layout] managed by the layout manager.
 	///

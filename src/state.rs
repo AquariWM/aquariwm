@@ -53,13 +53,12 @@ impl WindowState {
 	}
 }
 
-#[derive(Debug)]
 pub struct AquariWm<Window>
 where
 	Window: Eq + Hash,
 {
 	/// The current window layout.
-	pub layout: CurrentLayout,
+	pub layout: CurrentLayout<Window>,
 
 	/// A [`HashMap`] of windows and their current [`WindowState`s].
 	///
@@ -89,7 +88,7 @@ where
 
 	/// Creates a new AquariWM state struct with the given `layout` and no windows.
 	#[inline]
-	pub fn with_layout(layout: CurrentLayout) -> Self {
+	pub fn with_layout(layout: CurrentLayout<Window>) -> Self {
 		Self {
 			layout,
 			windows: HashMap::new(),
@@ -105,7 +104,7 @@ where
 
 	/// Creates a new AquariWM state struct with the given `layout` and `windows`.
 	pub fn with_layout_and_windows(
-		layout: CurrentLayout,
+		layout: CurrentLayout<Window>,
 		windows: impl IntoIterator<Item = (Window, MapState)>,
 	) -> Self {
 		let mut aquariwm = Self {
