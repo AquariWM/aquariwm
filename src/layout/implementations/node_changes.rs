@@ -9,6 +9,15 @@ use futures::StreamExt;
 use super::*;
 
 impl<Window> GroupNode<Window> {
+	/// Rotates the group's [`orientation`] by the given number of `rotations`.
+	///
+	/// A positive number of rotations will rotate the [`orientation`] clockwise, while a negative
+	/// number of rotations will rotate the [`orientation`] counter-clockwise.
+	///
+	/// # See also
+	/// - [`set_orientation`](Self::set_orientation)
+	///
+	/// [`orientation`]: Self::orientation()
 	pub fn rotate_by(&mut self, rotations: i32) {
 		let current = match self.orientation {
 			Orientation::LeftToRight => 0,
@@ -29,12 +38,31 @@ impl<Window> GroupNode<Window> {
 		self.set_orientation(new);
 	}
 
-	pub fn set_orientation(&mut self, new: Orientation) {
-		// Exclusive OR is used because if the axis has already been changed, then changing it again
-		// means it is changed back to what it was.
-		self.axis_changed ^= self.orientation.axis() != new.axis();
+	/// Returns the group's [orientation].
+	///
+	/// # See also
+	/// - [`set_orientation`](Self::set_orientation)
+	/// - [`rotate_by`](Self::rotate_by)
+	///
+	/// [orientation]: Orientation
+	// NOTE: This will return the `new_orientation`	if it is set - for the current orientation
+	//       before that is applied, use the `self.orientation` field.
+	pub fn orientation(&self) -> Orientation {
+		if let Some(orientation) = self.new_orientation {
+			orientation
+		} else {
+			self.orientation
+		}
+	}
 
-		self.orientation = new;
+	/// Sets the group's [`orientation`].
+	///
+	/// # See also
+	/// - [`rotate_by`](Self::rotate_by)
+	///
+	/// [`orientation`]: Self::orientation()
+	pub fn set_orientation(&mut self, new: Orientation) {
+		self.new_orientation = Some(new);
 	}
 }
 
@@ -47,7 +75,7 @@ impl<Window> GroupNode<Window> {
 		self.track_remove(index);
 
 		let size_fn = Node::size_fn(self.orientation.axis());
-		self.total_removed_size += size_fn(&node);
+		self.total_removed_primary += size_fn(&node);
 
 		node
 	}
@@ -140,45 +168,70 @@ impl<Window> GroupNode<Window> {
 }
 
 impl<Window> GroupNode<Window> {
+	/// Applies the changes made by the [layout manager].
+	///
+	/// `resize_window` is a function that resizes the given window based on the given [primary] and
+	/// [secondary] dimensions.
+	///
+	/// [layout manager]: TilingLayoutManager
+	///
+	/// [primary]: Node::primary
+	/// [secondary]: Node::secondary
+	// TODO: take changes in the group's dimensions into account. the group should have `new_width`
+	//     : and `new_height` fields.
 	fn apply_changes<ResizeRet>(&mut self, resize_window: impl FnMut(&Window, Option<u32>, Option<u32>) -> ResizeRet) {
-		let additions = mem::take(&mut self.additions);
-		let total_removed_size = mem::take(&mut self.total_removed_size);
-		// TODO: take `axis_changed` into account - requires modifying how `total_removed_size` is
-		//     : determined, as what 'size' means is going to change at the point the axis changes.
-		//     : could just track the removed width and height or something...
+		// The old axis of the group, before any orientation change.
+		let old_axis = self.orientation.axis();
+		// Apply the change in orientation, if it is to be changed.
+		if let Some(new) = mem::take(&mut self.new_orientation) {
+			self.orientation = new;
+		}
+
+		// The order of dimensions used for nodes depends on the orientation of the group. The first
+		// dimension, `primary`, is the dimension that is affected by the node's size within the
+		// group, while the second dimension, `secondary`, is the dimension that is only affected by
+		// the group's size.
 		//
-		// let axis_changed = mem::take(&mut self.axis_changed);
+		// ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+		// ┃           Dimensions (primary, secondary)             ┃
+		// ┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┯━━━━━━━━━━━━━━━━━━━━━┩
+		// │           Horizontal            │       Vertical      │
+		// ├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+		// │                                 │         ⟵secondary⟶ │
+		// │                                 │       ↑ ╔═════════╗ │
+		// │                                 │ primary ║  Node   ║ │
+		// │           ⟵primary⟶             │       ↓ ╚═════════╝ │
+		// │         ↑ ╔═══════╗╔════╗╔════╗ │         ╔═════════╗ │
+		// │ secondary ║ Node  ║║    ║║    ║ │         ║         ║ │
+		// │         ↓ ╚═══════╝╚════╝╚════╝ │         ╚═════════╝ │
+		// │                                 │         ╔═════════╗ │
+		// │                                 │         ║         ║ │
+		// │                                 │         ╚═════════╝ │
+		// └─────────────────────────────────┴─────────────────────┘
 
-		let total_node_size = self.total_node_size - total_removed_size;
+		let old_total_node_primary = self.total_node_primary - mem::take(&mut self.total_removed_primary);
 
-		let (group_size, group_other) = (self.size(), self.other());
-		let set_node_dimensions = |node, width, height| {
-			if let Some(width) = width {
-				node.set_width(width);
+		let (group_primary, group_secondary) = (self.primary(), self.secondary());
+		// Set a node's dimensions and call `resize_window` if it is a window.
+		let set_node_dimensions = |node, primary, secondary| {
+			if let Some(primary) = primary {
+				node.set_primary(primary);
 			}
-			if let Some(height) = height {
-				node.set_height(height);
+			if let Some(secondary) = secondary {
+				node.set_secondary(secondary);
 			}
 
 			if let Node::Window(WindowNode { window, .. }) = &node {
-				resize_window(window, width, height);
+				resize_window(window, primary, secondary);
 			}
 		};
-		let (node_size, set_node_dimensions) = match self.orientation.axis() {
-			Axis::Horizontal => (Node::width, |node, size, other| {
-				set_node_dimensions(node, size, other);
-			}),
 
-			Axis::Vertical => (Node::height, |node, size, other| {
-				set_node_dimensions(node, other, size);
-			}),
-		};
-
+		let additions = mem::take(&mut self.additions);
 		// The size of new additions.
-		let new_size = group_size / self.nodes.len();
-		let mut new_total_node_size = new_size * additions.len();
+		let new_primary = group_primary / self.nodes.len();
+		let mut new_total_node_primary = new_primary * additions.len();
 		// The new total size for the existing nodes to be resized to fit within.
-		let rescaling_size = group_size - new_total_node_size;
+		let rescaling_primary = group_primary - new_total_node_primary;
 
 		let mut additions = additions.into_iter();
 		let mut next_addition = additions.next();
@@ -190,7 +243,7 @@ impl<Window> GroupNode<Window> {
 			// If `node` is an addition, resize it with the new size.
 			if let Some(addition) = next_addition {
 				if index == addition {
-					set_node_dimensions(node, Some(new_size), Some(group_other));
+					set_node_dimensions(node, Some(new_primary), Some(group_secondary));
 
 					next_addition = additions.next();
 					continue;
@@ -200,12 +253,18 @@ impl<Window> GroupNode<Window> {
 			// `node` is not an addition: rescale it.
 
 			// Determine the rescaled size.
-			let rescaled_size = (node_size(node) * rescaling_size) / total_node_size;
+			let old_primary = node.primary(old_axis);
+			let rescaled_primary = (old_primary * rescaling_primary) / old_total_node_primary;
 
-			set_node_dimensions(node, Some(rescaled_size), None);
-			new_total_node_size += rescaled_size;
+			set_node_dimensions(
+				node,
+				Some(rescaled_primary),
+				// If the axis has changed, the node's secondary has to be updated too.
+				(old_axis != self.orientation.axis()).then_some(group_secondary),
+			);
+			new_total_node_primary += rescaled_primary;
 		}
 
-		self.total_node_size = new_total_node_size;
+		self.total_node_primary = new_total_node_primary;
 	}
 }

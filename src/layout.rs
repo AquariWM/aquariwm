@@ -117,7 +117,7 @@ pub struct GroupNode<Window> {
 
 	nodes: Vec<Node<Window>>,
 	/// The total size of all nodes along the [axis] of the group.
-	total_node_size: u32,
+	total_node_primary: u32,
 
 	/// Additions to `nodes` made by the [layout manager] in the latest [`add_window`] or
 	/// [`remove_window`] call.
@@ -132,32 +132,19 @@ pub struct GroupNode<Window> {
 	/// [`add_window`]: TilingLayoutManager::add_window
 	/// [`remove_window`]: TilingLayoutManager::remove_window
 	additions: Vec<usize>,
-	total_removed_size: u32,
-	/// Whether the [`axis`] of the group's `orientation` was changed by the [layout manager] in the
-	/// latest [`add_window`] or [`remove_window`] called.
+	total_removed_primary: u32,
+	/// The new [`orientation`] for the group set by the [layout manager] in the latest
+	/// [`add_window`] or [`remove_window`] call.
 	///
-	/// [`axis`]: Orientation::axis
+	/// [`orientation`]: Self::orientation()
+	/// [layout manager]: TilingLayoutManager
 	///
 	/// [`add_window`]: TilingLayoutManager::add_window
 	/// [`remove_window`]: TilingLayoutManager::remove_window
-	axis_changed: bool,
+	new_orientation: Option<Orientation>,
 
 	width: u32,
 	height: u32,
-}
-
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
-enum NodeChange {
-	/// A node was inserted at the wrapped `index`.
-	Addition { index: usize },
-	/// A node was removed at the wrapped `index` that had the wrapped `size`.
-	///
-	/// `size` refers to the dimension of the node that is aligned with the group's [axis]. It is
-	/// the dimension that changes when the node is resized; the other dimension changes only when
-	/// this group is resized in the same other dimension.
-	///
-	/// [axis]: Axis
-	Deletion { index: usize, size: u32 },
 }
 
 /// Represents a [node] containing a window.

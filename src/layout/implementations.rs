@@ -2,14 +2,14 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-mod node_changes;
-
 use std::{
 	borrow::{Borrow, BorrowMut},
 	ops::{Deref, DerefMut},
 };
 
 use super::*;
+
+mod node_changes;
 
 impl<Window> CurrentLayout<Window> {
 	/// Creates a new [tiled layout] using the given layout `Manager` type parameter.
@@ -69,6 +69,7 @@ impl<Window> Node<Window> {
 		Self::Group(GroupNode::new(orientation, width, height))
 	}
 
+	/// Returns the width of the node.
 	pub(crate) fn width(&self) -> u32 {
 		match self {
 			Self::Window(node) => node.width,
@@ -76,6 +77,7 @@ impl<Window> Node<Window> {
 		}
 	}
 
+	/// Returns the height of the node.
 	pub(crate) fn height(&self) -> u32 {
 		match self {
 			Self::Window(node) => node.height,
@@ -83,6 +85,7 @@ impl<Window> Node<Window> {
 		}
 	}
 
+	/// Sets the `width` of the node.
 	pub(crate) fn set_width(&mut self, width: u32) {
 		match self {
 			Self::Window(node) => node.width = width,
@@ -90,6 +93,7 @@ impl<Window> Node<Window> {
 		}
 	}
 
+	/// Sets the `height` of the node.
 	pub(crate) fn set_height(&mut self, height: u32) {
 		match self {
 			Self::Window(node) => node.height = height,
@@ -97,17 +101,43 @@ impl<Window> Node<Window> {
 		}
 	}
 
-	pub(crate) fn size_fn(axis: Axis) -> fn(&Self) -> u32 {
+	/// Sets the primary axis of the node.
+	///
+	/// The primary axis is the one that affects the node's size within its group.
+	pub(crate) fn primary(&self, axis: Axis) -> u32 {
 		match axis {
-			Axis::Horizontal => Self::width,
-			Axis::Vertical => Self::height,
+			Axis::Horizontal => self.width(),
+			Axis::Vertical => self.height(),
 		}
 	}
 
-	pub(crate) fn set_size_fn(axis: Axis) -> fn(&mut Self, u32) {
+	/// Sets the secondary axis of the node.
+	///
+	/// The secondary axis is the one that is only affected by the size of the node's group.
+	pub(crate) fn secondary(&self, axis: Axis) -> u32 {
 		match axis {
-			Axis::Horizontal => Self::set_width,
-			Axis::Vertical => Self::set_height,
+			Axis::Horizontal => self.height(),
+			Axis::Vertical => self.width(),
+		}
+	}
+
+	/// Sets the [`primary`] axis of the node.
+	///
+	/// [`primary`]: Self::primary
+	pub(crate) fn set_primary(&mut self, primary: u32, axis: Axis) {
+		match axis {
+			Axis::Horizontal => self.set_width(primary),
+			Axis::Vertical => self.set_height(primary),
+		}
+	}
+
+	/// Sets the [`secondary`] axis of the node.
+	///
+	/// [`secondary`]: Self::secondary
+	pub(crate) fn set_secondary(&mut self, secondary: u32, axis: Axis) {
+		match axis {
+			Axis::Horizontal => self.set_height(secondary),
+			Axis::Vertical => self.set_width(secondary),
 		}
 	}
 }
@@ -125,28 +155,25 @@ impl<Window> GroupNode<Window> {
 			orientation,
 
 			nodes: Vec::new(),
-			total_node_size: 0,
+			total_node_primary: 0,
 
 			additions: Vec::new(),
-			total_removed_size: 0,
-			axis_changed: false,
+			total_removed_primary: 0,
+			new_orientation: None,
 
 			width,
 			height,
 		}
 	}
 
-	pub(crate) fn size(&self) -> u32 {
+	pub(crate) fn primary(&self) -> u32 {
 		match self.orientation.axis() {
 			Axis::Horizontal => self.width,
 			Axis::Vertical => self.height,
 		}
 	}
 
-	/// Returns the dimension that is not the [size()].
-	///
-	/// [size()]: Self::size()
-	pub(crate) fn other(&self) -> u32 {
+	pub(crate) fn secondary(&self) -> u32 {
 		match self.orientation.axis() {
 			Axis::Horizontal => self.height,
 			Axis::Vertical => self.width,
@@ -222,6 +249,21 @@ impl Orientation {
 		match self {
 			Self::LeftToRight | Self::RightToLeft => Axis::Horizontal,
 			Self::TopToBottom | Self::BottomToTop => Axis::Vertical,
+		}
+	}
+}
+
+impl Axis {
+	/// Returns the other axis.
+	///
+	/// For [`Horizontal`], [`Vertical`] is returned. For [`Vertical`], [`Horizontal`] is returned.
+	///
+	/// [`Horizontal`]: Self::Horizontal
+	/// [`Vertical`]: Self::Vertical
+	pub fn flipped(&self) -> Axis {
+		match self {
+			Self::Horizontal => Self::Vertical,
+			Self::Vertical => Self::Horizontal,
 		}
 	}
 }
