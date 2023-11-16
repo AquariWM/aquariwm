@@ -38,13 +38,13 @@ impl<Window> TilingLayout<Window> {
 
 impl<Window> Borrow<GroupNode<Window>> for TilingLayout<Window> {
 	fn borrow(&self) -> &GroupNode<Window> {
-		&self.root
+		self
 	}
 }
 
 impl<Window> BorrowMut<GroupNode<Window>> for TilingLayout<Window> {
 	fn borrow_mut(&mut self) -> &mut GroupNode<Window> {
-		&mut self.root
+		self
 	}
 }
 
@@ -52,13 +52,13 @@ impl<Window> Deref for TilingLayout<Window> {
 	type Target = GroupNode<Window>;
 
 	fn deref(&self) -> &Self::Target {
-		self
+		&self.root
 	}
 }
 
 impl<Window> DerefMut for TilingLayout<Window> {
 	fn deref_mut(&mut self) -> &mut Self::Target {
-		self
+		&mut self.root
 	}
 }
 
