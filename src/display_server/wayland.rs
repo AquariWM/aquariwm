@@ -86,7 +86,7 @@ impl DisplayServer for Wayland {
 		// End the initialisation span.
 		init_span.exit();
 
-		event_loop.run(None, &mut state, move |state| {})?;
+		event_loop.run(None, &mut state, move |_state| {})?;
 
 		Ok(())
 	}

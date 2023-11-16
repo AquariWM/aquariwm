@@ -4,7 +4,6 @@
 
 use super::*;
 
-#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Stack<Window>(TilingLayout<Window>);
 
 // TODO: unsafe impl<Window> TilingLayoutManager<Window> for Stack<Window>

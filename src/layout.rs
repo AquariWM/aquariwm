@@ -218,16 +218,18 @@ pub struct WindowNode<Window> {
 /// [removed]: Self::remove_window
 /// [`remove_window`]: Self::remove_window
 pub unsafe trait TilingLayoutManager<Window>: Send + Sync {
-	// FIXME: can't have consts in traits that are able to be trait objects
-	// /// The default [orientation] for layouts created with this layout manager.
-	// ///
-	// /// [orientation]: Orientation
-	// const ORIENTATION: Orientation;
+	/// The default [orientation] for layouts created with this layout manager.
+	///
+	/// [orientation]: Orientation
+	fn orientation() -> Orientation
+	where
+		Self: Sized;
 
 	fn init<WindowsIter>(layout: TilingLayout<Window>, windows: WindowsIter) -> Self
 	where
 		Self: Sized,
-		WindowsIter: IntoIterator<Item = Window> + ExactSizeIterator;
+		WindowsIter: IntoIterator<Item = Window>,
+		WindowsIter::IntoIter: ExactSizeIterator;
 
 	/// Returns a shared reference to the [layout] managed by the layout manager.
 	///

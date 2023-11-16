@@ -4,8 +4,6 @@
 
 use std::mem;
 
-use futures::StreamExt;
-
 use super::*;
 
 impl<Window> GroupNode<Window> {
@@ -74,8 +72,7 @@ impl<Window> GroupNode<Window> {
 		let node = self.nodes.remove(index);
 		self.track_remove(index);
 
-		let size_fn = Node::size_fn(self.orientation.axis());
-		self.total_removed_primary += size_fn(&node);
+		self.total_removed_primary += node.primary(self.orientation.axis());
 
 		node
 	}
@@ -189,7 +186,10 @@ impl<Window> GroupNode<Window> {
 	///
 	/// [primary]: Node::primary
 	/// [secondary]: Node::secondary
-	fn apply_changes<ResizeRet>(&mut self, resize_window: impl FnMut(&Window, u32, u32) -> ResizeRet + Clone) {
+	fn apply_changes<Error>(
+		&mut self,
+		mut resize_window: impl FnMut(&Window, u32, u32) -> Result<(), Error> + Clone,
+	) -> Result<(), Error> {
 		// If no changes have been made to this group, apply all the child groups' changes and return.
 		if !self.changes_made() {
 			let groups = self.nodes.iter_mut().filter_map(|node| match node {
@@ -199,10 +199,10 @@ impl<Window> GroupNode<Window> {
 			});
 
 			for group in groups {
-				group.apply_changes(resize_window.clone());
+				group.apply_changes(resize_window.clone())?;
 			}
 
-			return;
+			return Ok(());
 		}
 
 		let additions = mem::take(&mut self.additions);
@@ -256,19 +256,19 @@ impl<Window> GroupNode<Window> {
 
 		let (group_primary, group_secondary) = (self.primary(), self.secondary());
 		// Set a node's dimensions and call `resize_window` if it is a window.
-		let set_node_dimensions = |node, primary, secondary| {
+		let mut set_node_dimensions = |node: &mut Node<Window>, primary, secondary| {
 			node.set_primary(primary, new_axis);
 			node.set_secondary(secondary, new_axis);
 
 			match node {
 				Node::Group(group) => group.apply_changes(resize_window.clone()),
-				Node::Window(WindowNode { window, .. }) => resize_window(&window, primary, secondary),
+				Node::Window(WindowNode { window, .. }) => resize_window(window, primary, secondary),
 			}
 		};
 
 		// The size of new additions.
-		let new_primary = group_primary / self.nodes.len();
-		let mut new_total_node_primary = new_primary * additions.len();
+		let new_primary = group_primary / (self.nodes.len() as u32);
+		let mut new_total_node_primary = new_primary * (additions.len() as u32);
 		// The new total size for the existing nodes to be resized to fit within.
 		let rescaling_primary = group_primary - new_total_node_primary;
 
@@ -282,7 +282,7 @@ impl<Window> GroupNode<Window> {
 			// If `node` is an addition, resize it with the new size.
 			if let Some(addition) = next_addition {
 				if index == addition {
-					set_node_dimensions(node, new_primary, group_secondary);
+					set_node_dimensions(node, new_primary, group_secondary)?;
 
 					next_addition = additions.next();
 					continue;
@@ -295,11 +295,13 @@ impl<Window> GroupNode<Window> {
 			let old_primary = node.primary(old_axis);
 			let rescaled_primary = (old_primary * rescaling_primary) / old_total_node_primary;
 
-			set_node_dimensions(node, rescaled_primary, group_secondary);
+			set_node_dimensions(node, rescaled_primary, group_secondary)?;
 
 			new_total_node_primary += rescaled_primary;
 		}
 
 		self.total_node_primary = new_total_node_primary;
+
+		Ok(())
 	}
 }

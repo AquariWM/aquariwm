@@ -15,11 +15,14 @@ impl<Window> CurrentLayout<Window> {
 	/// Creates a new [tiled layout] using the given layout `Manager` type parameter.
 	///
 	/// [tiled layout]: Self::Tiled
-	pub(crate) fn new_tiled<Manager>(windows: impl IntoIterator<Item = Window>, width: u32, height: u32) -> Self
+	pub(crate) fn new_tiled<Manager, Windows>(windows: Windows, width: u32, height: u32) -> Self
 	where
-		Manager: TilingLayoutManager<Window>,
+		Manager: TilingLayoutManager<Window> + 'static,
+
+		Windows: IntoIterator<Item = Window>,
+		Windows::IntoIter: ExactSizeIterator,
 	{
-		let layout = TilingLayout::new(Manager::ORIENTATION, width, height);
+		let layout = TilingLayout::new(Manager::orientation(), width, height);
 
 		Self::Tiled(Box::new(Manager::init(layout, windows)))
 	}
@@ -34,14 +37,14 @@ impl<Window> TilingLayout<Window> {
 	}
 }
 
-impl<Window> Borrow<[Window]> for TilingLayout<Window> {
-	fn borrow(&self) -> &[Window] {
+impl<Window> Borrow<[Node<Window>]> for TilingLayout<Window> {
+	fn borrow(&self) -> &[Node<Window>] {
 		&self.root
 	}
 }
 
-impl<Window> BorrowMut<[Window]> for TilingLayout<Window> {
-	fn borrow_mut(&mut self) -> &mut [Window] {
+impl<Window> BorrowMut<[Node<Window>]> for TilingLayout<Window> {
+	fn borrow_mut(&mut self) -> &mut [Node<Window>] {
 		&mut self.root
 	}
 }
@@ -206,20 +209,20 @@ impl<Window> GroupNode<Window> {
 	}
 }
 
-impl<Window> Borrow<[Window]> for GroupNode<Window> {
-	fn borrow(&self) -> &[Window] {
+impl<Window> Borrow<[Node<Window>]> for GroupNode<Window> {
+	fn borrow(&self) -> &[Node<Window>] {
 		&self.nodes
 	}
 }
 
-impl<Window> BorrowMut<[Window]> for GroupNode<Window> {
-	fn borrow_mut(&mut self) -> &mut [Window] {
+impl<Window> BorrowMut<[Node<Window>]> for GroupNode<Window> {
+	fn borrow_mut(&mut self) -> &mut [Node<Window>] {
 		&mut self.nodes
 	}
 }
 
 impl<Window> Deref for GroupNode<Window> {
-	type Target = [Window];
+	type Target = [Node<Window>];
 
 	fn deref(&self) -> &Self::Target {
 		self
