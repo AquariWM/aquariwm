@@ -4,7 +4,7 @@
 
 use std::{
 	borrow::{Borrow, BorrowMut},
-	ops::{Deref, DerefMut},
+	ops::{Deref, DerefMut, Index, IndexMut},
 };
 
 use super::*;
@@ -17,8 +17,7 @@ impl<Window> CurrentLayout<Window> {
 	/// [tiled layout]: Self::Tiled
 	pub(crate) fn new_tiled<Manager, Windows>(windows: Windows, width: u32, height: u32) -> Self
 	where
-		Manager: TilingLayoutManager<Window> + 'static,
-
+		Manager: TilingLayoutManager<Window>,
 		Windows: IntoIterator<Item = Window>,
 		Windows::IntoIter: ExactSizeIterator,
 	{
@@ -37,20 +36,20 @@ impl<Window> TilingLayout<Window> {
 	}
 }
 
-impl<Window> Borrow<[Node<Window>]> for TilingLayout<Window> {
-	fn borrow(&self) -> &[Node<Window>] {
+impl<Window> Borrow<GroupNode<Window>> for TilingLayout<Window> {
+	fn borrow(&self) -> &GroupNode<Window> {
 		&self.root
 	}
 }
 
-impl<Window> BorrowMut<[Node<Window>]> for TilingLayout<Window> {
-	fn borrow_mut(&mut self) -> &mut [Node<Window>] {
+impl<Window> BorrowMut<GroupNode<Window>> for TilingLayout<Window> {
+	fn borrow_mut(&mut self) -> &mut GroupNode<Window> {
 		&mut self.root
 	}
 }
 
 impl<Window> Deref for TilingLayout<Window> {
-	type Target = [Window];
+	type Target = GroupNode<Window>;
 
 	fn deref(&self) -> &Self::Target {
 		self
@@ -157,10 +156,10 @@ impl<Window> GroupNode<Window> {
 		Self {
 			orientation,
 
-			nodes: Vec::new(),
+			nodes: VecDeque::new(),
 			total_node_primary: 0,
 
-			additions: Vec::new(),
+			additions: VecDeque::new(),
 			total_removed_primary: 0,
 
 			new_orientation: None,
@@ -169,6 +168,100 @@ impl<Window> GroupNode<Window> {
 
 			width,
 			height,
+		}
+	}
+
+	/// Returns the number of child [nodes] in the group.
+	///
+	/// This does not include further descendents of the group; a group with a single child group
+	/// that itself has children is still going to have a `len` of 1.
+	///
+	/// [nodes]: Node
+	pub fn len(&self) -> usize {
+		self.nodes.len()
+	}
+
+	/// Returns [`true`] if there are no [nodes] in the group.
+	///
+	/// [nodes]: Node
+	pub fn is_empty(&self) -> bool {
+		self.nodes.is_empty()
+	}
+
+	/// Returns the first [node], or [`None`] if the group is empty.
+	///
+	/// [node]: Node
+	pub fn first(&self) -> Option<&Node<Window>> {
+		match self.len() {
+			0 => None,
+			_ => Some(&self[0]),
+		}
+	}
+
+	/// Returns the last [node], or [`None`] if the group is empty.
+	///
+	/// [node]: Node
+	pub fn last(&self) -> Option<&Node<Window>> {
+		match self.len() {
+			0 => None,
+			len => Some(&self[len - 1]),
+		}
+	}
+
+	/// Returns a mutable reference to the first [node], or [`None`] if the group is empty.
+	///
+	/// [node]: Node
+	pub fn first_mut(&mut self) -> Option<&mut Node<Window>> {
+		match self.len() {
+			0 => None,
+			_ => Some(&mut self[0]),
+		}
+	}
+
+	/// Returns a mutable reference to the last [node], or [`None`] if the group is empty.
+	///
+	/// [node]: Node
+	pub fn last_mut(&mut self) -> Option<&mut Node<Window>> {
+		match self.len() {
+			0 => None,
+			len => Some(&mut self[len - 1]),
+		}
+	}
+
+	/// Returns the [node] at the given `index`, or [`None`] if the `index` is out of bounds.
+	///
+	/// [node]: Node
+	pub fn get(&self, index: usize) -> Option<&Node<Window>> {
+		let index = if !self.orientation().reversed() {
+			index
+		} else {
+			let last = self.nodes.len() - 1;
+			last - index
+		};
+
+		if index < self.nodes.len() {
+			Some(&self.nodes[index])
+		} else {
+			None
+		}
+	}
+
+	/// Returns a mutable reference to the [node] at the given `index`, or [`None`] if the `index`
+	/// is out of bounds.
+	///
+	/// [node]: Node
+	pub fn get_mut(&mut self, index: usize) -> Option<&mut Node<Window>> {
+		let index = if !self.orientation().reversed() {
+			index
+		} else {
+			let last = self.nodes.len() - 1;
+			last - index
+		};
+
+		if index < self.nodes.len() {
+			Some(&mut self.nodes[index])
+		} else {
+			None
 		}
 	}
 
@@ -209,29 +302,31 @@ impl<Window> GroupNode<Window> {
 	}
 }
 
-impl<Window> Borrow<[Node<Window>]> for GroupNode<Window> {
-	fn borrow(&self) -> &[Node<Window>] {
-		&self.nodes
+impl<Window> Index<usize> for GroupNode<Window> {
+	type Output = Node<Window>;
+
+	fn index(&self, index: usize) -> &Self::Output {
+		if !self.orientation().reversed() {
+			&self.nodes[index]
+		} else {
+			let last = self.nodes.len() - 1;
+			let index = last - index;
+
+			&self.nodes[index]
+		}
 	}
 }
 
-impl<Window> BorrowMut<[Node<Window>]> for GroupNode<Window> {
-	fn borrow_mut(&mut self) -> &mut [Node<Window>] {
-		&mut self.nodes
-	}
-}
+impl<Window> IndexMut<usize> for GroupNode<Window> {
+	fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+		if !self.orientation().reversed() {
+			&mut self.nodes[index]
+		} else {
+			let last = self.nodes.len() - 1;
+			let index = last - index;
 
-impl<Window> Deref for GroupNode<Window> {
-	type Target = [Node<Window>];
-
-	fn deref(&self) -> &Self::Target {
-		self
-	}
-}
-
-impl<Window> DerefMut for GroupNode<Window> {
-	fn deref_mut(&mut self) -> &mut Self::Target {
-		self
+			&mut self.nodes[index]
+		}
 	}
 }
 
@@ -251,6 +346,7 @@ impl Orientation {
 	///
 	/// [right-to-left]: Orientation::RightToLeft
 	/// [bottom-to-top]: Orientation::BottomToTop
+	#[inline]
 	pub fn reversed(&self) -> bool {
 		match self {
 			Self::LeftToRight | Self::TopToBottom => false,
@@ -273,6 +369,7 @@ impl Orientation {
 	///
 	/// [`Horizontal` axis]: Axis::Horizontal
 	/// [`Vertical` axis]: Axis::Vertical
+	#[inline]
 	pub fn axis(&self) -> Axis {
 		match self {
 			Self::LeftToRight | Self::RightToLeft => Axis::Horizontal,
@@ -288,6 +385,7 @@ impl Axis {
 	///
 	/// [`Horizontal`]: Self::Horizontal
 	/// [`Vertical`]: Self::Vertical
+	#[inline]
 	pub fn flipped(&self) -> Axis {
 		match self {
 			Self::Horizontal => Self::Vertical,

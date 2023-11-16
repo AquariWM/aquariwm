@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use std::fmt::Debug;
+use std::{collections::VecDeque, fmt::Debug};
 
 /// Contains `impl` blocks for types defined in [layout].
 ///
@@ -115,7 +115,7 @@ pub enum Node<Window> {
 pub struct GroupNode<Window> {
 	orientation: Orientation,
 
-	nodes: Vec<Node<Window>>,
+	nodes: VecDeque<Node<Window>>,
 	/// The total size of all nodes along the [axis] of the group.
 	total_node_primary: u32,
 
@@ -131,7 +131,7 @@ pub struct GroupNode<Window> {
 	///
 	/// [`add_window`]: TilingLayoutManager::add_window
 	/// [`remove_window`]: TilingLayoutManager::remove_window
-	additions: Vec<usize>,
+	additions: VecDeque<usize>,
 	total_removed_primary: u32,
 
 	/// The new [`orientation`] for the group set by the [layout manager] in the latest
@@ -217,7 +217,7 @@ pub struct WindowNode<Window> {
 ///
 /// [removed]: Self::remove_window
 /// [`remove_window`]: Self::remove_window
-pub unsafe trait TilingLayoutManager<Window>: Send + Sync {
+pub unsafe trait TilingLayoutManager<Window>: Send + Sync + 'static {
 	/// The default [orientation] for layouts created with this layout manager.
 	///
 	/// [orientation]: Orientation

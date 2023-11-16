@@ -68,11 +68,14 @@ impl<Window> GroupNode<Window> {
 	/// Removes the [node] at the given `index` from the group.
 	///
 	/// [node]: Node
-	pub fn remove(&mut self, index: usize) -> Node<Window> {
+	pub fn remove(&mut self, index: usize) -> Option<Node<Window>> {
 		let node = self.nodes.remove(index);
-		self.track_remove(index);
 
-		self.total_removed_primary += node.primary(self.orientation.axis());
+		if let Some(node) = self.nodes.remove(index) {
+			self.track_remove(index);
+
+			self.total_removed_primary += node.primary(self.orientation.axis());
+		}
 
 		node
 	}
@@ -84,12 +87,20 @@ impl<Window> GroupNode<Window> {
 		self.push_node(Node::new_window(window, 0, 0));
 	}
 
+	pub fn push_windows(&mut self, windows: impl IntoIterator<Item = Window>) {
+		self.push_nodes(windows.into_iter().map(|window| Node::new_window(window, 0, 0)));
+	}
+
 	/// Inserts a new [window node] with the given `window` at the given `index` in the group.
 	///
 	/// [window node]: WindowNode
 	pub fn insert_window(&mut self, index: usize, window: Window) {
 		self.nodes.insert(index, Node::new_window(window, 0, 0));
 		self.track_insert(index);
+	}
+
+	pub fn insert_windows(&mut self, index: usize, windows: impl IntoIterator<Item = Window>) {
+		self.insert_nodes(index, windows.into_iter().map(|window| Node::new_window(window, 0, 0)));
 	}
 
 	/// Pushes a new [group node] of the given `orientation` to the end of the group.
@@ -99,26 +110,151 @@ impl<Window> GroupNode<Window> {
 		self.push_node(Node::new_group(orientation, 0, 0));
 	}
 
+	/// Pushes a new [group node] of the given `orientation` to the end of the group, then
+	/// initialises it with the given `init` function.
+	///
+	/// [group node]: GroupNode
+	pub fn push_group_with(&mut self, orientation: Orientation, init: impl FnOnce(&mut GroupNode<Window>)) {
+		let index = self.push_node(Node::new_group(orientation, 0, 0));
+
+		match &mut self.nodes[index] {
+			Node::Group(group) => init(group),
+			Node::Window(_) => unreachable!("we know the this node is a group, because we just added it"),
+		}
+	}
+
+	pub fn push_groups(&mut self, orientations: impl IntoIterator<Item = Orientation>) {
+		self.push_nodes(
+			orientations
+				.into_iter()
+				.map(|orientation| Node::new_group(orientation, 0, 0)),
+		);
+	}
+
 	/// Inserts a new [group node] of the given `orientation` at the given `index` in the group.
 	///
 	/// [group node]: GroupNode
 	pub fn insert_group(&mut self, index: usize, orientation: Orientation) {
-		self.nodes.insert(index, Node::new_group(orientation, 0, 0));
-		self.track_insert(index);
+		self.insert_node(index, Node::new_group(orientation, 0, 0));
 	}
 
-	fn push_node(&mut self, node: Node<Window>) {
-		if !self.orientation.reversed() {
+	/// Inserts a new [group node] of the given `orientation` at the given `index` in the group,
+	/// then initialises it with the given `init` function.
+	///
+	/// [group node]: GroupNode
+	pub fn insert_group_with(
+		&mut self,
+		index: usize,
+		orientation: Orientation,
+		init: impl FnOnce(&mut GroupNode<Window>),
+	) {
+		let index = self.insert_node(index, Node::new_group(orientation, 0, 0));
+
+		match &mut self.nodes[index] {
+			Node::Group(group) => init(group),
+			Node::Window(_) => unreachable!("we know this node is a group, because we just added it"),
+		}
+	}
+
+	pub fn insert_groups(&mut self, index: usize, orientations: impl IntoIterator<Item = Orientation>) {
+		self.insert_nodes(
+			index,
+			orientations
+				.into_iter()
+				.map(|orientation| Node::new_group(orientation, 0, 0)),
+		);
+	}
+
+	/// Push the given `node` to the list, and return the index it was pushed to.
+	///
+	/// The index is affected by whether this group is [reversed] or not.
+	///
+	/// [reversed]: Orientation::reversed
+	fn push_node(&mut self, node: Node<Window>) -> usize {
+		if !self.orientation().reversed() {
 			// The orientation is not reversed; we push to the end of the list as usual.
 
-			self.nodes.push(node);
-			self.track_push();
+			let index = self.nodes.len();
+
+			self.nodes.push_back(node);
+			self.track_push_back();
+
+			index
 		} else {
 			// The orientation is reversed; we push to the front of the list to give the impression
 			// we are pushing to the back in the non-reversed orientation equivalent.
 
-			self.nodes.insert(0, node);
+			self.nodes.push_front(node);
 			self.track_insert(0);
+
+			0
+		}
+	}
+
+	fn push_nodes(&mut self, nodes: impl IntoIterator<Item = Node<Window>>) {
+		let mut nodes = nodes.into_iter();
+
+		let (min_nodes, _) = nodes.size_hint();
+		self.nodes.reserve(min_nodes);
+
+		if !self.orientation().reversed() {
+			for node in nodes {
+				self.nodes.push_back(node);
+			}
+		} else {
+			for node in nodes {
+				self.nodes.push_front(node);
+			}
+		}
+	}
+
+	/// Insert the given `node` to the list, and return the index it was pushed to.
+	///
+	/// The index is affected by whether this group is [reversed] or not.
+	///
+	/// [reversed]: Orientation::reversed
+	fn insert_node(&mut self, index: usize, node: Node<Window>) -> usize {
+		if !self.orientation().reversed() {
+			// The orientation is not reversed; we insert as usual.
+
+			self.nodes.insert(index, node);
+			self.track_insert(index);
+
+			index
+		} else {
+			// The orientation is reversed; we insert at the `index` _counting back from the end_ to give the
+			// impression we are inserting at `index` counting from the front in the non-reversed orientation
+			// equivalent.
+
+			let last = self.nodes.len() - 1;
+			let index = last - index;
+
+			self.nodes.insert(index, node);
+			self.track_insert(index);
+
+			index
+		}
+	}
+
+	fn insert_nodes(&mut self, index: usize, nodes: impl IntoIterator<Item = Node<Window>>) {
+		let mut nodes = nodes.into_iter();
+
+		let (min_nodes, _) = nodes.size_hint();
+		self.nodes.reserve(min_nodes);
+
+		if !self.orientation().reversed() {
+			for (index, node) in nodes.enumerate().map(|(i, node)| (index + i, node)) {
+				self.nodes.insert(index, node);
+				self.track_insert(index);
+			}
+		} else {
+			let last = self.nodes.len() - 1;
+			let index = last - index;
+
+			for node in nodes {
+				self.nodes.insert(index, node);
+				self.track_insert(index);
+			}
 		}
 	}
 
@@ -128,19 +264,23 @@ impl<Window> GroupNode<Window> {
 		self.additions.insert(insertion_point, index);
 
 		// Move following additions over by 1.
-		for addition in &mut self.additions[(insertion_point + 1)..] {
+		for addition in &mut self.additions.make_contiguous()[(insertion_point + 1)..] {
 			*addition += 1;
 		}
 	}
 
 	/// Update `additions` to reflect a node being pushed to the end of `nodes`.
-	fn track_push(&mut self) {
-		let index = self.len() - 1;
+	fn track_push_back(&mut self) {
+		let index = self.nodes.len() - 1;
 
 		// If the node has been pushed to the end, then it must have the greatest index.
-		self.additions.push(index);
+		self.additions.push_back(index);
 
 		// There will be no additions following it to move over, as it was pushed to the end.
+	}
+
+	fn track_push_front(&mut self) {
+		self.additions.push_front(0);
 	}
 
 	/// Update `additions` to reflect the removal of a node at `index`.
@@ -158,7 +298,7 @@ impl<Window> GroupNode<Window> {
 		};
 
 		// Move following additions back by 1.
-		for addition in &mut self.additions[shifted_additions] {
+		for addition in &mut self.additions.make_contiguous()[shifted_additions] {
 			*addition -= 1;
 		}
 	}
