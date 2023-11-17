@@ -9,6 +9,7 @@ use std::{
 
 use super::*;
 
+mod iter;
 mod node_changes;
 
 impl<Window> CurrentLayout<Window> {

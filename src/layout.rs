@@ -187,19 +187,22 @@ pub struct WindowNode<Window> {
 /// This trait should be implemented for all possible window types so that it works on all AquariWM
 /// display server implementations.
 /// ```
-/// # struct MyLayoutManager<Window>;
+/// # struct MyManager<Window: Send + Sync + 'static>;
 /// #
-/// unsafe impl<Window> TilingLayoutManager<Window>
-///     for MyLayoutManager<Window> {
+/// unsafe impl<Window: Send + Sync + 'static>
+///     TilingLayoutManager<Window> for MyManager<Window> {
 ///     // ...
-/// #     const ORIENTATION: Orientation = Orientation::LeftToRight;
+/// #     fn orientation() -> Orientation
+/// #     where
+/// #         Self: Sized,
+/// #     { Orientation::LeftToRight }
 /// #
-/// #     fn init(
-/// #         layout: TilingLayout<Window>,
-/// #         windows: impl IntoIterator<Item = Window>,
-/// #     ) -> Self {
-/// #         Self
-/// #     }
+/// #     fn init<WindowsIter>(layout: TilingLayout<Window>, windows: WindowsIter) -> Self
+/// #     where
+/// #         Self: Sized,
+/// #         WindowsIter: IntoIterator<Item = Window>,
+/// #         WindowsIter::IntoIter: ExactSizeIterator,
+/// #     { Self }
 /// #
 /// #     fn layout(&self) -> &TilingLayout<Window> { unimplemented!() }
 /// #     fn layout_mut(&self) -> &mut TilingLayout<Window> { unimplemented!() }
