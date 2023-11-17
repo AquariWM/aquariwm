@@ -146,6 +146,7 @@ impl<Window> Node<Window> {
 }
 
 impl<Window> WindowNode<Window> {
+	#[inline]
 	pub(crate) fn new(window: Window, width: u32, height: u32) -> Self {
 		Self { window, width, height }
 	}
@@ -178,6 +179,7 @@ impl<Window> GroupNode<Window> {
 	/// that itself has children is still going to have a `len` of 1.
 	///
 	/// [nodes]: Node
+	#[inline]
 	pub fn len(&self) -> usize {
 		self.nodes.len()
 	}
@@ -185,6 +187,7 @@ impl<Window> GroupNode<Window> {
 	/// Returns [`true`] if there are no [nodes] in the group.
 	///
 	/// [nodes]: Node
+	#[inline]
 	pub fn is_empty(&self) -> bool {
 		self.nodes.is_empty()
 	}
@@ -192,6 +195,7 @@ impl<Window> GroupNode<Window> {
 	/// Returns the first [node], or [`None`] if the group is empty.
 	///
 	/// [node]: Node
+	#[inline]
 	pub fn first(&self) -> Option<&Node<Window>> {
 		match self.len() {
 			0 => None,
@@ -202,6 +206,7 @@ impl<Window> GroupNode<Window> {
 	/// Returns the last [node], or [`None`] if the group is empty.
 	///
 	/// [node]: Node
+	#[inline]
 	pub fn last(&self) -> Option<&Node<Window>> {
 		match self.len() {
 			0 => None,
@@ -212,6 +217,7 @@ impl<Window> GroupNode<Window> {
 	/// Returns a mutable reference to the first [node], or [`None`] if the group is empty.
 	///
 	/// [node]: Node
+	#[inline]
 	pub fn first_mut(&mut self) -> Option<&mut Node<Window>> {
 		match self.len() {
 			0 => None,
@@ -222,6 +228,7 @@ impl<Window> GroupNode<Window> {
 	/// Returns a mutable reference to the last [node], or [`None`] if the group is empty.
 	///
 	/// [node]: Node
+	#[inline]
 	pub fn last_mut(&mut self) -> Option<&mut Node<Window>> {
 		match self.len() {
 			0 => None,
@@ -233,14 +240,14 @@ impl<Window> GroupNode<Window> {
 	///
 	/// [node]: Node
 	pub fn get(&self, index: usize) -> Option<&Node<Window>> {
-		let index = if !self.orientation().reversed() {
-			index
-		} else {
-			let last = self.nodes.len() - 1;
-			last - index
-		};
-
 		if index < self.nodes.len() {
+			let index = if !self.orientation().reversed() {
+				index
+			} else {
+				let last = self.nodes.len() - 1;
+				last - index
+			};
+
 			Some(&self.nodes[index])
 		} else {
 			None
@@ -252,20 +259,21 @@ impl<Window> GroupNode<Window> {
 	///
 	/// [node]: Node
 	pub fn get_mut(&mut self, index: usize) -> Option<&mut Node<Window>> {
-		let index = if !self.orientation().reversed() {
-			index
-		} else {
-			let last = self.nodes.len() - 1;
-			last - index
-		};
-
 		if index < self.nodes.len() {
+			let index = if !self.orientation().reversed() {
+				index
+			} else {
+				let last = self.nodes.len() - 1;
+				last - index
+			};
+
 			Some(&mut self.nodes[index])
 		} else {
 			None
 		}
 	}
 
+	#[inline]
 	pub(crate) fn primary(&self) -> u32 {
 		match self.orientation().axis() {
 			Axis::Horizontal => self.width,
@@ -273,6 +281,7 @@ impl<Window> GroupNode<Window> {
 		}
 	}
 
+	#[inline]
 	pub(crate) fn secondary(&self) -> u32 {
 		match self.orientation().axis() {
 			Axis::Horizontal => self.height,
@@ -280,14 +289,17 @@ impl<Window> GroupNode<Window> {
 		}
 	}
 
+	#[inline]
 	pub(crate) fn set_width(&mut self, width: u32) {
 		self.new_width = Some(width);
 	}
 
+	#[inline]
 	pub(crate) fn set_height(&mut self, height: u32) {
 		self.new_height = Some(height);
 	}
 
+	#[inline]
 	pub(crate) fn set_primary(&mut self, primary: u32) {
 		match self.orientation().axis() {
 			Axis::Horizontal => self.set_width(primary),
@@ -295,6 +307,7 @@ impl<Window> GroupNode<Window> {
 		}
 	}
 
+	#[inline]
 	pub(crate) fn set_secondary(&mut self, secondary: u32) {
 		match self.orientation().axis() {
 			Axis::Horizontal => self.set_height(secondary),

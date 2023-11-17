@@ -65,7 +65,7 @@ unsafe impl<Window: Send + Sync + 'static> TilingLayoutManager<Window> for Stack
 
 			// If there are more windows, then add them in a stack.
 			if windows.len() > 0 {
-				layout.push_group_with(Orientation::TopToBottom, |stack| stack.push_windows(windows));
+				layout.push_group_back_with(Orientation::TopToBottom, |stack| stack.push_windows(windows));
 			}
 		}
 
@@ -98,7 +98,7 @@ unsafe impl<Window: Send + Sync + 'static> TilingLayoutManager<Window> for Stack
 
 			// Add the window to a new stack.
 			self.layout_mut()
-				.push_group_with(Orientation::TopToBottom, |stack| stack.push_window(window));
+				.push_group_back_with(Orientation::TopToBottom, |stack| stack.push_window(window));
 		}
 	}
 

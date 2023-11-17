@@ -84,11 +84,11 @@ impl<Window> GroupNode<Window> {
 	///
 	/// [window node]: WindowNode
 	pub fn push_window(&mut self, window: Window) {
-		self.push_node(Node::new_window(window, 0, 0));
+		self.push_node_back(Node::new_window(window, 0, 0));
 	}
 
 	pub fn push_windows(&mut self, windows: impl IntoIterator<Item = Window>) {
-		self.push_nodes(windows.into_iter().map(|window| Node::new_window(window, 0, 0)));
+		self.push_nodes_back(windows.into_iter().map(|window| Node::new_window(window, 0, 0)));
 	}
 
 	/// Inserts a new [window node] with the given `window` at the given `index` in the group.
@@ -106,16 +106,16 @@ impl<Window> GroupNode<Window> {
 	/// Pushes a new [group node] of the given `orientation` to the end of the group.
 	///
 	/// [group node]: GroupNode
-	pub fn push_group(&mut self, orientation: Orientation) {
-		self.push_node(Node::new_group(orientation, 0, 0));
+	pub fn push_group_back(&mut self, orientation: Orientation) {
+		self.push_node_back(Node::new_group(orientation, 0, 0));
 	}
 
 	/// Pushes a new [group node] of the given `orientation` to the end of the group, then
 	/// initialises it with the given `init` function.
 	///
 	/// [group node]: GroupNode
-	pub fn push_group_with(&mut self, orientation: Orientation, init: impl FnOnce(&mut GroupNode<Window>)) {
-		let index = self.push_node(Node::new_group(orientation, 0, 0));
+	pub fn push_group_back_with(&mut self, orientation: Orientation, init: impl FnOnce(&mut GroupNode<Window>)) {
+		let index = self.push_node_back(Node::new_group(orientation, 0, 0));
 
 		match &mut self.nodes[index] {
 			Node::Group(group) => init(group),
@@ -123,8 +123,8 @@ impl<Window> GroupNode<Window> {
 		}
 	}
 
-	pub fn push_groups(&mut self, orientations: impl IntoIterator<Item = Orientation>) {
-		self.push_nodes(
+	pub fn push_groups_back(&mut self, orientations: impl IntoIterator<Item = Orientation>) {
+		self.push_nodes_back(
 			orientations
 				.into_iter()
 				.map(|orientation| Node::new_group(orientation, 0, 0)),
@@ -134,6 +134,7 @@ impl<Window> GroupNode<Window> {
 	/// Inserts a new [group node] of the given `orientation` at the given `index` in the group.
 	///
 	/// [group node]: GroupNode
+	#[inline]
 	pub fn insert_group(&mut self, index: usize, orientation: Orientation) {
 		self.insert_node(index, Node::new_group(orientation, 0, 0));
 	}
@@ -170,7 +171,7 @@ impl<Window> GroupNode<Window> {
 	/// The index is affected by whether this group is [reversed] or not.
 	///
 	/// [reversed]: Orientation::reversed
-	fn push_node(&mut self, node: Node<Window>) -> usize {
+	fn push_node_back(&mut self, node: Node<Window>) -> usize {
 		if !self.orientation().reversed() {
 			// The orientation is not reversed; we push to the end of the list as usual.
 
@@ -184,15 +185,35 @@ impl<Window> GroupNode<Window> {
 			// The orientation is reversed; we push to the front of the list to give the impression
 			// we are pushing to the back in the non-reversed orientation equivalent.
 
-			self.nodes.push_front(node);
-			self.track_insert(0);
+			const INDEX: usize = 0;
 
-			0
+			self.nodes.push_front(node);
+			self.track_push_front();
+
+			INDEX
 		}
 	}
 
-	fn push_nodes(&mut self, nodes: impl IntoIterator<Item = Node<Window>>) {
-		let mut nodes = nodes.into_iter();
+	fn push_node_front(&mut self, node: Node<Window>) -> usize {
+		if !self.orientation().reversed() {
+			const INDEX: usize = 0;
+
+			self.nodes.push_front(node);
+			self.track_push_front();
+
+			INDEX
+		} else {
+			let index = self.nodes.len();
+
+			self.nodes.push_back(node);
+			self.track_push_back();
+
+			index
+		}
+	}
+
+	fn push_nodes_back(&mut self, nodes: impl IntoIterator<Item = Node<Window>>) {
+		let nodes = nodes.into_iter();
 
 		let (min_nodes, _) = nodes.size_hint();
 		self.nodes.reserve(min_nodes);
@@ -204,6 +225,23 @@ impl<Window> GroupNode<Window> {
 		} else {
 			for node in nodes {
 				self.nodes.push_front(node);
+			}
+		}
+	}
+
+	fn push_nodes_front(&mut self, nodes: impl IntoIterator<Item = Node<Window>>) {
+		let nodes = nodes.into_iter();
+
+		let (min_nodes, _) = nodes.size_hint();
+		self.nodes.reserve(min_nodes);
+
+		if !self.orientation().reversed() {
+			for node in nodes {
+				self.nodes.push_front(node);
+			}
+		} else {
+			for node in nodes {
+				self.nodes.push_back(node);
 			}
 		}
 	}
@@ -237,7 +275,7 @@ impl<Window> GroupNode<Window> {
 	}
 
 	fn insert_nodes(&mut self, index: usize, nodes: impl IntoIterator<Item = Node<Window>>) {
-		let mut nodes = nodes.into_iter();
+		let nodes = nodes.into_iter();
 
 		let (min_nodes, _) = nodes.size_hint();
 		self.nodes.reserve(min_nodes);
@@ -270,6 +308,7 @@ impl<Window> GroupNode<Window> {
 	}
 
 	/// Update `additions` to reflect a node being pushed to the end of `nodes`.
+	#[inline]
 	fn track_push_back(&mut self) {
 		let index = self.nodes.len() - 1;
 
@@ -280,6 +319,13 @@ impl<Window> GroupNode<Window> {
 	}
 
 	fn track_push_front(&mut self) {
+		// Move every existing addition over by 1; if the node has been pushed to the front, it has the
+		// lowest index.
+		for addition in &mut self.additions {
+			*addition += 1;
+		}
+
+		// Push the addition to the front.
 		self.additions.push_front(0);
 	}
 
@@ -299,6 +345,35 @@ impl<Window> GroupNode<Window> {
 
 		// Move following additions back by 1.
 		for addition in &mut self.additions.make_contiguous()[shifted_additions] {
+			*addition -= 1;
+		}
+	}
+
+	fn track_pop_back(&mut self) {
+		if !self.additions.is_empty() {
+			// The index that the node was popped from.
+			let index = self.nodes.len();
+
+			// If it was one of our own additions, pop that addition.
+			if self.additions[self.additions.len() - 1] == index {
+				self.additions.pop_back();
+			}
+		}
+	}
+
+	fn track_pop_front(&mut self) {
+		if !self.additions.is_empty() {
+			// The index that the node was popped from.
+			const INDEX: usize = 0;
+
+			// If it was one of our own additions, pop that addition.
+			if self.additions[0] == INDEX {
+				self.additions.pop_front();
+			}
+		}
+
+		// Move all the additions back by one.
+		for addition in &mut self.additions {
 			*addition -= 1;
 		}
 	}
