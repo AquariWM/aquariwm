@@ -55,7 +55,7 @@ impl<Window> GroupNode<Window> {
 	pub fn remove(&mut self, index: usize) -> Option<Node<Window>> {
 		let node = self.children.remove(index);
 
-		if let Some(node) = self.children.remove(index) {
+		if let Some(node) = &node {
 			self.track_remove(index);
 
 			self.total_removed_primary += node.primary(self.orientation.axis());
@@ -67,39 +67,67 @@ impl<Window> GroupNode<Window> {
 	/// Pushes a new [window node] with the given `window` to the end of the group.
 	///
 	/// [window node]: WindowNode
+	#[inline]
 	pub fn push_window_back(&mut self, window: Window) {
-		self.push_node_back(Node::new_window(window, 0, 0));
+		self.push_node_back(Node::new_window(window));
 	}
 
+	/// Pushes new [window nodes] of the given `windows` to the end of the group.
+	///
+	/// [window nodes]: WindowNode
+	#[inline]
 	pub fn push_windows_back(&mut self, windows: impl IntoIterator<Item = Window>) {
-		self.push_nodes_back(windows.into_iter().map(|window| Node::new_window(window, 0, 0)));
+		self.push_nodes_back(windows.into_iter().map(Node::new_window));
+	}
+
+	/// Pushes a new [window node] with the given `window` to the beginning of the group.
+	///
+	/// [window node]: WindowNode
+	#[inline]
+	pub fn push_window_front(&mut self, window: Window) {
+		self.push_node_front(Node::new_window(window));
+	}
+
+	/// Pushes new [window nodes] of the given `windows` to the beginning of the group.
+	///
+	/// [window nodes]: WindowNode
+	#[inline]
+	pub fn push_windows_front(&mut self, windows: impl IntoIterator<Item = Window>) {
+		self.push_nodes_front(windows.into_iter().map(Node::new_window));
 	}
 
 	/// Inserts a new [window node] with the given `window` at the given `index` in the group.
 	///
 	/// [window node]: WindowNode
+	#[inline]
 	pub fn insert_window(&mut self, index: usize, window: Window) {
-		self.children.insert(index, Node::new_window(window, 0, 0));
+		self.children.insert(index, Node::new_window(window));
 		self.track_insert(index);
 	}
 
+	/// Inserts new [window nodes] of the given `windows` at the given `index` in the group.
+	///
+	/// [window nodes]: WindowNode
+	#[inline]
 	pub fn insert_windows(&mut self, index: usize, windows: impl IntoIterator<Item = Window>) {
-		self.insert_nodes(index, windows.into_iter().map(|window| Node::new_window(window, 0, 0)));
+		self.insert_nodes(index, windows.into_iter().map(Node::new_window));
 	}
 
 	/// Pushes a new [group node] of the given `orientation` to the end of the group.
 	///
 	/// [group node]: GroupNode
+	#[inline]
 	pub fn push_group_back(&mut self, orientation: Orientation) {
-		self.push_node_back(Node::new_group(orientation, 0, 0));
+		self.push_node_back(Node::new_group(orientation));
 	}
 
 	/// Pushes a new [group node] of the given `orientation` to the end of the group, then
 	/// initialises it with the given `init` function.
 	///
 	/// [group node]: GroupNode
+	#[inline]
 	pub fn push_group_back_with(&mut self, orientation: Orientation, init: impl FnOnce(&mut GroupNode<Window>)) {
-		let index = self.push_node_back(Node::new_group(orientation, 0, 0));
+		let index = self.push_node_back(Node::new_group(orientation));
 
 		match &mut self.children[index] {
 			Node::Group(group) => init(group),
@@ -107,12 +135,42 @@ impl<Window> GroupNode<Window> {
 		}
 	}
 
+	/// Pushes new [group nodes] of the given `orientations` to the end of the group.
+	///
+	/// [group nodes]: GroupNode
+	#[inline]
 	pub fn push_groups_back(&mut self, orientations: impl IntoIterator<Item = Orientation>) {
-		self.push_nodes_back(
-			orientations
-				.into_iter()
-				.map(|orientation| Node::new_group(orientation, 0, 0)),
-		);
+		self.push_nodes_back(orientations.into_iter().map(Node::new_group));
+	}
+
+	/// Pushes a new [group node] of the given `orientation` to the beginning of the group.
+	///
+	/// [group node]: GroupNode
+	#[inline]
+	pub fn push_group_front(&mut self, orientation: Orientation) {
+		self.push_node_front(Node::new_group(orientation));
+	}
+
+	/// Pushes a new [group node] of the given `orientation` to the beginning of the group, then
+	/// initialises it with the given `init` function.
+	///
+	/// [group node]: GroupNode
+	#[inline]
+	pub fn push_group_front_with(&mut self, orientation: Orientation, init: impl FnOnce(&mut GroupNode<Window>)) {
+		let index = self.push_node_front(Node::new_group(orientation));
+
+		match &mut self.children[index] {
+			Node::Group(group) => init(group),
+			Node::Window(_) => unreachable!("we know the this node is a group, because we just added it"),
+		}
+	}
+
+	/// Pushes new [group nodes] of the given `orientations` to the beginning of the group.
+	///
+	/// [group nodes]: GroupNode
+	#[inline]
+	pub fn push_groups_front(&mut self, orientations: impl IntoIterator<Item = Orientation>) {
+		self.push_nodes_front(orientations.into_iter().map(Node::new_group))
 	}
 
 	/// Inserts a new [group node] of the given `orientation` at the given `index` in the group.
@@ -120,20 +178,21 @@ impl<Window> GroupNode<Window> {
 	/// [group node]: GroupNode
 	#[inline]
 	pub fn insert_group(&mut self, index: usize, orientation: Orientation) {
-		self.insert_node(index, Node::new_group(orientation, 0, 0));
+		self.insert_node(index, Node::new_group(orientation));
 	}
 
 	/// Inserts a new [group node] of the given `orientation` at the given `index` in the group,
 	/// then initialises it with the given `init` function.
 	///
 	/// [group node]: GroupNode
+	#[inline]
 	pub fn insert_group_with(
 		&mut self,
 		index: usize,
 		orientation: Orientation,
 		init: impl FnOnce(&mut GroupNode<Window>),
 	) {
-		let index = self.insert_node(index, Node::new_group(orientation, 0, 0));
+		let index = self.insert_node(index, Node::new_group(orientation));
 
 		match &mut self.children[index] {
 			Node::Group(group) => init(group),
@@ -141,13 +200,12 @@ impl<Window> GroupNode<Window> {
 		}
 	}
 
+	/// Inserts new [group nodes] of the given `orientations` at the given `index` in the group.
+	///
+	/// [group nodes]: GroupNode
+	#[inline]
 	pub fn insert_groups(&mut self, index: usize, orientations: impl IntoIterator<Item = Orientation>) {
-		self.insert_nodes(
-			index,
-			orientations
-				.into_iter()
-				.map(|orientation| Node::new_group(orientation, 0, 0)),
-		);
+		self.insert_nodes(index, orientations.into_iter().map(Node::new_group));
 	}
 
 	/// Push the given `node` to the list, and return the index it was pushed to.
@@ -224,10 +282,12 @@ impl<Window> GroupNode<Window> {
 		if !self.orientation().reversed() {
 			for node in nodes {
 				self.children.push_front(node);
+				self.track_push_front();
 			}
 		} else {
 			for node in nodes {
 				self.children.push_back(node);
+				self.track_push_front();
 			}
 		}
 	}
@@ -335,6 +395,7 @@ impl<Window> GroupNode<Window> {
 		}
 	}
 
+	#[inline]
 	fn track_pop_back(&mut self) {
 		if !self.additions.is_empty() {
 			// The index that the node was popped from.
@@ -523,7 +584,7 @@ mod tests {
 		const ROTATIONS: i32 = 6;
 		const NEW_ORIENTATION: Orientation = Orientation::RightToLeft;
 
-		let mut group: GroupNode<()> = GroupNode::new(INITIAL_ORIENTATION, 0, 0);
+		let mut group: GroupNode<()> = GroupNode::with_dimensions(INITIAL_ORIENTATION, 0, 0);
 
 		assert_eq!(group.orientation, INITIAL_ORIENTATION);
 		assert_eq!(group.new_orientation, None);
@@ -549,18 +610,18 @@ mod tests {
 	fn push_windows() {
 		const WINDOWS: [u32; 5] = [1, 2, 3, 4, 5];
 
-		let non_reversed_nodes = VecDeque::from(WINDOWS.map(|window| Node::new_window(window, 0, 0)));
+		let non_reversed_nodes = VecDeque::from(WINDOWS.map(Node::new_window));
 		let reversed_nodes: VecDeque<_> = non_reversed_nodes.iter().cloned().rev().collect();
 
 		// Test a non-reversed group.
-		let mut non_reversed_group: GroupNode<u32> = GroupNode::new(Orientation::LeftToRight, 0, 0);
+		let mut non_reversed_group: GroupNode<u32> = GroupNode::new(Orientation::LeftToRight);
 		assert_eq!(non_reversed_group.children, VecDeque::new());
 
 		non_reversed_group.push_windows_back(WINDOWS);
 		assert_eq!(non_reversed_group.children, non_reversed_nodes);
 
 		// Test a reversed group.
-		let mut reversed_group: GroupNode<u32> = GroupNode::new(Orientation::RightToLeft, 0, 0);
+		let mut reversed_group: GroupNode<u32> = GroupNode::new(Orientation::RightToLeft);
 
 		reversed_group.push_windows_back(WINDOWS);
 		assert_eq!(reversed_group.children, reversed_nodes);
@@ -579,7 +640,7 @@ mod tests {
 		// The width of each node after three nodes have been added.
 		const THREE_NODES_WIDTH: u32 = GROUP_WIDTH / 3;
 
-		let mut group: GroupNode<u32> = GroupNode::new(Orientation::LeftToRight, GROUP_WIDTH, GROUP_HEIGHT);
+		let mut group: GroupNode<u32> = GroupNode::with_dimensions(Orientation::LeftToRight, GROUP_WIDTH, GROUP_HEIGHT);
 
 		group.push_window_back(1);
 

@@ -16,6 +16,7 @@ impl<Window> CurrentLayout<Window> {
 	/// Creates a new [tiled layout] using the given layout `Manager` type parameter.
 	///
 	/// [tiled layout]: Self::Tiled
+	#[inline]
 	pub(crate) fn new_tiled<Manager, Windows>(windows: Windows, width: u32, height: u32) -> Self
 	where
 		Manager: TilingLayoutManager<Window>,
@@ -30,20 +31,23 @@ impl<Window> CurrentLayout<Window> {
 
 impl<Window> TilingLayout<Window> {
 	/// Creates an empty layout of the given `orientation`.
+	#[inline]
 	pub(crate) const fn new(orientation: Orientation, width: u32, height: u32) -> Self {
 		Self {
-			root: GroupNode::new(orientation, width, height),
+			root: GroupNode::with_dimensions(orientation, width, height),
 		}
 	}
 }
 
 impl<Window> Borrow<GroupNode<Window>> for TilingLayout<Window> {
+	#[inline]
 	fn borrow(&self) -> &GroupNode<Window> {
 		self
 	}
 }
 
 impl<Window> BorrowMut<GroupNode<Window>> for TilingLayout<Window> {
+	#[inline]
 	fn borrow_mut(&mut self) -> &mut GroupNode<Window> {
 		self
 	}
@@ -52,27 +56,42 @@ impl<Window> BorrowMut<GroupNode<Window>> for TilingLayout<Window> {
 impl<Window> Deref for TilingLayout<Window> {
 	type Target = GroupNode<Window>;
 
+	#[inline]
 	fn deref(&self) -> &Self::Target {
 		&self.root
 	}
 }
 
 impl<Window> DerefMut for TilingLayout<Window> {
+	#[inline]
 	fn deref_mut(&mut self) -> &mut Self::Target {
 		&mut self.root
 	}
 }
 
 impl<Window> Node<Window> {
-	pub(crate) const fn new_window(window: Window, width: u32, height: u32) -> Self {
-		Self::Window(WindowNode::new(window, width, height))
+	#[inline]
+	pub(crate) const fn new_window(window: Window) -> Self {
+		Self::Window(WindowNode::new(window))
 	}
 
-	pub(crate) const fn new_group(orientation: Orientation, width: u32, height: u32) -> Self {
-		Self::Group(GroupNode::new(orientation, width, height))
+	#[inline]
+	pub(crate) const fn window_with_dimensions(window: Window, width: u32, height: u32) -> Self {
+		Self::Window(WindowNode::with_dimensions(window, width, height))
+	}
+
+	#[inline]
+	pub(crate) const fn new_group(orientation: Orientation) -> Self {
+		Self::Group(GroupNode::new(orientation))
+	}
+
+	#[inline]
+	pub(crate) const fn group_with_dimensions(orientation: Orientation, width: u32, height: u32) -> Self {
+		Self::Group(GroupNode::with_dimensions(orientation, width, height))
 	}
 
 	/// Returns the width of the node.
+	#[inline]
 	pub(crate) const fn width(&self) -> u32 {
 		match self {
 			Self::Window(node) => node.width,
@@ -81,6 +100,7 @@ impl<Window> Node<Window> {
 	}
 
 	/// Returns the height of the node.
+	#[inline]
 	pub(crate) const fn height(&self) -> u32 {
 		match self {
 			Self::Window(node) => node.height,
@@ -89,6 +109,7 @@ impl<Window> Node<Window> {
 	}
 
 	/// Sets the `width` of the node.
+	#[inline]
 	pub(crate) fn set_width(&mut self, width: u32) {
 		match self {
 			Self::Window(node) => node.width = width,
@@ -97,6 +118,7 @@ impl<Window> Node<Window> {
 	}
 
 	/// Sets the `height` of the node.
+	#[inline]
 	pub(crate) fn set_height(&mut self, height: u32) {
 		match self {
 			Self::Window(node) => node.height = height,
@@ -107,6 +129,7 @@ impl<Window> Node<Window> {
 	/// Sets the primary axis of the node.
 	///
 	/// The primary axis is the one that affects the node's size within its group.
+	#[inline]
 	pub(crate) const fn primary(&self, axis: Axis) -> u32 {
 		match axis {
 			Axis::Horizontal => self.width(),
@@ -117,6 +140,7 @@ impl<Window> Node<Window> {
 	/// Sets the secondary axis of the node.
 	///
 	/// The secondary axis is the one that is only affected by the size of the node's group.
+	#[inline]
 	pub(crate) const fn secondary(&self, axis: Axis) -> u32 {
 		match axis {
 			Axis::Horizontal => self.height(),
@@ -127,6 +151,7 @@ impl<Window> Node<Window> {
 	/// Sets the [`primary`] axis of the node.
 	///
 	/// [`primary`]: Self::primary
+	#[inline]
 	pub(crate) fn set_primary(&mut self, primary: u32, axis: Axis) {
 		match axis {
 			Axis::Horizontal => self.set_width(primary),
@@ -137,6 +162,7 @@ impl<Window> Node<Window> {
 	/// Sets the [`secondary`] axis of the node.
 	///
 	/// [`secondary`]: Self::secondary
+	#[inline]
 	pub(crate) fn set_secondary(&mut self, secondary: u32, axis: Axis) {
 		match axis {
 			Axis::Horizontal => self.set_height(secondary),
@@ -146,15 +172,33 @@ impl<Window> Node<Window> {
 }
 
 impl<Window> WindowNode<Window> {
+	/// Creates a window node of the given `window` and dimensions of 0 by 0.
+	///
+	/// It is useful to create a window node with no size if that size is intended to be filled in
+	/// later.
 	#[inline]
-	pub(crate) const fn new(window: Window, width: u32, height: u32) -> Self {
+	pub(crate) const fn new(window: Window) -> Self {
+		Self::with_dimensions(window, 0, 0)
+	}
+
+	/// Creates a window node of the given `window` and dimensions.
+	#[inline]
+	pub(crate) const fn with_dimensions(window: Window, width: u32, height: u32) -> Self {
 		Self { window, width, height }
 	}
 }
 
 impl<Window> GroupNode<Window> {
-	/// Creates an empty group of the given `orientation`.
-	pub(crate) const fn new(orientation: Orientation, width: u32, height: u32) -> Self {
+	/// Creates an empty group of the given `orientation` and dimensions of 0 by 0.
+	///
+	/// It is useful to create a group with no size if that size is intended to be filled in later.
+	#[inline]
+	pub(crate) const fn new(orientation: Orientation) -> Self {
+		Self::with_dimensions(orientation, 0, 0)
+	}
+
+	/// Creates an empty group of the given `orientation` and dimensions.
+	pub(crate) const fn with_dimensions(orientation: Orientation, width: u32, height: u32) -> Self {
 		Self {
 			orientation,
 
@@ -274,7 +318,7 @@ impl<Window> GroupNode<Window> {
 	}
 
 	#[inline]
-	pub(crate) fn primary(&self) -> u32 {
+	pub(crate) const fn primary(&self) -> u32 {
 		match self.orientation().axis() {
 			Axis::Horizontal => self.width,
 			Axis::Vertical => self.height,
@@ -282,7 +326,7 @@ impl<Window> GroupNode<Window> {
 	}
 
 	#[inline]
-	pub(crate) fn secondary(&self) -> u32 {
+	pub(crate) const fn secondary(&self) -> u32 {
 		match self.orientation().axis() {
 			Axis::Horizontal => self.height,
 			Axis::Vertical => self.width,
@@ -409,7 +453,7 @@ impl Orientation {
 			2 => Orientation::RightToLeft,
 			3 => Orientation::BottomToTop,
 
-			_ => unreachable!(".div_euclid(4) returns a value within 0..4"),
+			_ => unreachable!(".rem_euclid(4) returns a value within 0..4"),
 		}
 	}
 }
@@ -422,7 +466,7 @@ impl Axis {
 	/// [`Horizontal`]: Self::Horizontal
 	/// [`Vertical`]: Self::Vertical
 	#[inline]
-	pub fn flipped(&self) -> Axis {
+	pub const fn flipped(&self) -> Axis {
 		match self {
 			Self::Horizontal => Self::Vertical,
 			Self::Vertical => Self::Horizontal,
