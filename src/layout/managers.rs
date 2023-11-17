@@ -61,11 +61,11 @@ unsafe impl<Window: Send + Sync + 'static> TilingLayoutManager<Window> for Stack
 		let mut windows = windows.into_iter();
 
 		if let Some(main) = windows.next() {
-			layout.push_window(main);
+			layout.push_window_back(main);
 
 			// If there are more windows, then add them in a stack.
 			if windows.len() > 0 {
-				layout.push_group_back_with(Orientation::TopToBottom, |stack| stack.push_windows(windows));
+				layout.push_group_back_with(Orientation::TopToBottom, |stack| stack.push_windows_back(windows));
 			}
 		}
 
@@ -87,18 +87,18 @@ unsafe impl<Window: Send + Sync + 'static> TilingLayoutManager<Window> for Stack
 			// No main, no stack.
 
 			// Add the window as a main.
-			self.layout_mut().push_window(window);
+			self.layout_mut().push_window_back(window);
 		} else if let Some(stack) = self.stack_mut() {
 			// Main and stack.
 
 			// Add the window to the stack.
-			stack.push_window(window);
+			stack.push_window_back(window);
 		} else {
 			// Main, no stack.
 
 			// Add the window to a new stack.
 			self.layout_mut()
-				.push_group_back_with(Orientation::TopToBottom, |stack| stack.push_window(window));
+				.push_group_back_with(Orientation::TopToBottom, |stack| stack.push_window_back(window));
 		}
 	}
 

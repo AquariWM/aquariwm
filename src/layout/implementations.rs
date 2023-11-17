@@ -30,7 +30,7 @@ impl<Window> CurrentLayout<Window> {
 
 impl<Window> TilingLayout<Window> {
 	/// Creates an empty layout of the given `orientation`.
-	pub(crate) fn new(orientation: Orientation, width: u32, height: u32) -> Self {
+	pub(crate) const fn new(orientation: Orientation, width: u32, height: u32) -> Self {
 		Self {
 			root: GroupNode::new(orientation, width, height),
 		}
@@ -64,16 +64,16 @@ impl<Window> DerefMut for TilingLayout<Window> {
 }
 
 impl<Window> Node<Window> {
-	pub(crate) fn new_window(window: Window, width: u32, height: u32) -> Self {
+	pub(crate) const fn new_window(window: Window, width: u32, height: u32) -> Self {
 		Self::Window(WindowNode::new(window, width, height))
 	}
 
-	pub(crate) fn new_group(orientation: Orientation, width: u32, height: u32) -> Self {
+	pub(crate) const fn new_group(orientation: Orientation, width: u32, height: u32) -> Self {
 		Self::Group(GroupNode::new(orientation, width, height))
 	}
 
 	/// Returns the width of the node.
-	pub(crate) fn width(&self) -> u32 {
+	pub(crate) const fn width(&self) -> u32 {
 		match self {
 			Self::Window(node) => node.width,
 			Self::Group(node) => node.width,
@@ -81,7 +81,7 @@ impl<Window> Node<Window> {
 	}
 
 	/// Returns the height of the node.
-	pub(crate) fn height(&self) -> u32 {
+	pub(crate) const fn height(&self) -> u32 {
 		match self {
 			Self::Window(node) => node.height,
 			Self::Group(node) => node.height,
@@ -107,7 +107,7 @@ impl<Window> Node<Window> {
 	/// Sets the primary axis of the node.
 	///
 	/// The primary axis is the one that affects the node's size within its group.
-	pub(crate) fn primary(&self, axis: Axis) -> u32 {
+	pub(crate) const fn primary(&self, axis: Axis) -> u32 {
 		match axis {
 			Axis::Horizontal => self.width(),
 			Axis::Vertical => self.height(),
@@ -117,7 +117,7 @@ impl<Window> Node<Window> {
 	/// Sets the secondary axis of the node.
 	///
 	/// The secondary axis is the one that is only affected by the size of the node's group.
-	pub(crate) fn secondary(&self, axis: Axis) -> u32 {
+	pub(crate) const fn secondary(&self, axis: Axis) -> u32 {
 		match axis {
 			Axis::Horizontal => self.height(),
 			Axis::Vertical => self.width(),
@@ -147,18 +147,18 @@ impl<Window> Node<Window> {
 
 impl<Window> WindowNode<Window> {
 	#[inline]
-	pub(crate) fn new(window: Window, width: u32, height: u32) -> Self {
+	pub(crate) const fn new(window: Window, width: u32, height: u32) -> Self {
 		Self { window, width, height }
 	}
 }
 
 impl<Window> GroupNode<Window> {
 	/// Creates an empty group of the given `orientation`.
-	pub(crate) fn new(orientation: Orientation, width: u32, height: u32) -> Self {
+	pub(crate) const fn new(orientation: Orientation, width: u32, height: u32) -> Self {
 		Self {
 			orientation,
 
-			nodes: VecDeque::new(),
+			children: VecDeque::new(),
 			total_node_primary: 0,
 
 			additions: VecDeque::new(),
@@ -181,7 +181,7 @@ impl<Window> GroupNode<Window> {
 	/// [nodes]: Node
 	#[inline]
 	pub fn len(&self) -> usize {
-		self.nodes.len()
+		self.children.len()
 	}
 
 	/// Returns [`true`] if there are no [nodes] in the group.
@@ -189,7 +189,7 @@ impl<Window> GroupNode<Window> {
 	/// [nodes]: Node
 	#[inline]
 	pub fn is_empty(&self) -> bool {
-		self.nodes.is_empty()
+		self.children.is_empty()
 	}
 
 	/// Returns the first [node], or [`None`] if the group is empty.
@@ -240,15 +240,15 @@ impl<Window> GroupNode<Window> {
 	///
 	/// [node]: Node
 	pub fn get(&self, index: usize) -> Option<&Node<Window>> {
-		if index < self.nodes.len() {
+		if index < self.children.len() {
 			let index = if !self.orientation().reversed() {
 				index
 			} else {
-				let last = self.nodes.len() - 1;
+				let last = self.children.len() - 1;
 				last - index
 			};
 
-			Some(&self.nodes[index])
+			Some(&self.children[index])
 		} else {
 			None
 		}
@@ -259,15 +259,15 @@ impl<Window> GroupNode<Window> {
 	///
 	/// [node]: Node
 	pub fn get_mut(&mut self, index: usize) -> Option<&mut Node<Window>> {
-		if index < self.nodes.len() {
+		if index < self.children.len() {
 			let index = if !self.orientation().reversed() {
 				index
 			} else {
-				let last = self.nodes.len() - 1;
+				let last = self.children.len() - 1;
 				last - index
 			};
 
-			Some(&mut self.nodes[index])
+			Some(&mut self.children[index])
 		} else {
 			None
 		}
@@ -321,12 +321,12 @@ impl<Window> Index<usize> for GroupNode<Window> {
 
 	fn index(&self, index: usize) -> &Self::Output {
 		if !self.orientation().reversed() {
-			&self.nodes[index]
+			&self.children[index]
 		} else {
-			let last = self.nodes.len() - 1;
+			let last = self.children.len() - 1;
 			let index = last - index;
 
-			&self.nodes[index]
+			&self.children[index]
 		}
 	}
 }
@@ -334,12 +334,12 @@ impl<Window> Index<usize> for GroupNode<Window> {
 impl<Window> IndexMut<usize> for GroupNode<Window> {
 	fn index_mut(&mut self, index: usize) -> &mut Self::Output {
 		if !self.orientation().reversed() {
-			&mut self.nodes[index]
+			&mut self.children[index]
 		} else {
-			let last = self.nodes.len() - 1;
+			let last = self.children.len() - 1;
 			let index = last - index;
 
-			&mut self.nodes[index]
+			&mut self.children[index]
 		}
 	}
 }
@@ -361,7 +361,7 @@ impl Orientation {
 	/// [right-to-left]: Orientation::RightToLeft
 	/// [bottom-to-top]: Orientation::BottomToTop
 	#[inline]
-	pub fn reversed(&self) -> bool {
+	pub const fn reversed(&self) -> bool {
 		match self {
 			Self::LeftToRight | Self::TopToBottom => false,
 			Self::RightToLeft | Self::BottomToTop => true,
@@ -384,10 +384,32 @@ impl Orientation {
 	/// [`Horizontal` axis]: Axis::Horizontal
 	/// [`Vertical` axis]: Axis::Vertical
 	#[inline]
-	pub fn axis(&self) -> Axis {
+	pub const fn axis(&self) -> Axis {
 		match self {
 			Self::LeftToRight | Self::RightToLeft => Axis::Horizontal,
 			Self::TopToBottom | Self::BottomToTop => Axis::Vertical,
+		}
+	}
+
+	/// Returns this orientation rotated by the given number of `rotations`.
+	///
+	/// A positive number of rotations will rotate the orientation clockwise, while a negative
+	/// number of rotations will rotate the orientation counter-clockwise.
+	pub fn rotated_by(&self, rotations: i32) -> Self {
+		let current = match self {
+			Orientation::LeftToRight => 0,
+			Orientation::TopToBottom => 1,
+			Orientation::RightToLeft => 2,
+			Orientation::BottomToTop => 3,
+		};
+
+		match (current + rotations).rem_euclid(4) {
+			0 => Orientation::LeftToRight,
+			1 => Orientation::TopToBottom,
+			2 => Orientation::RightToLeft,
+			3 => Orientation::BottomToTop,
+
+			_ => unreachable!(".div_euclid(4) returns a value within 0..4"),
 		}
 	}
 }

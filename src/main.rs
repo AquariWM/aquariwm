@@ -2,6 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+#![warn(clippy::missing_const_for_fn)]
+// Feature flags
 #![feature(impl_trait_in_assoc_type)]
 #![feature(iterator_try_collect)]
 

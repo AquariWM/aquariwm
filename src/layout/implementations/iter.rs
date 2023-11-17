@@ -78,9 +78,9 @@ macro_rules! impl_iterator {
 			fn new(group: $(&$lt $($mut)?)? GroupNode<$Window>) -> Self {
 				Self {
 					$iter: if !group.orientation().reversed() {
-						GroupIterator::Normal(group.nodes.$iter())
+						GroupIterator::Normal(group.children.$iter())
 					} else {
-						GroupIterator::Rev(group.nodes.$iter().rev())
+						GroupIterator::Rev(group.children.$iter().rev())
 					},
 				}
 			}

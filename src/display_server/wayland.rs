@@ -127,7 +127,7 @@ impl Wayland {
 				model: format!("({})", Self::NAME),
 			},
 		);
-		output.create_global::<state::WaylandState>(&mut state.display_handle);
+		output.create_global::<state::WaylandState>(&state.display_handle);
 
 		output.change_current_state(
 			Some(output_mode),

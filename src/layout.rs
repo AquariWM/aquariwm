@@ -103,6 +103,7 @@ pub enum Axis {
 ///
 /// [group]: GroupNode
 /// [window]: Window
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum Node<Window> {
 	Group(GroupNode<Window>),
 	Window(WindowNode<Window>),
@@ -112,10 +113,11 @@ pub enum Node<Window> {
 ///
 /// [nodes]: Node
 /// [layout]: TilingLayout
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct GroupNode<Window> {
 	orientation: Orientation,
 
-	nodes: VecDeque<Node<Window>>,
+	children: VecDeque<Node<Window>>,
 	/// The total size of all nodes along the [axis] of the group.
 	total_node_primary: u32,
 
@@ -153,6 +155,7 @@ pub struct GroupNode<Window> {
 /// Represents a [node] containing a window.
 ///
 /// [node]: Node
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct WindowNode<Window> {
 	window: Window,
 

@@ -28,7 +28,7 @@ impl WindowState {
 	}
 
 	#[inline]
-	pub fn with_layout_mode(mode: layout::Mode, mapped: MapState) -> Self {
+	pub const fn with_layout_mode(mode: layout::Mode, mapped: MapState) -> Self {
 		Self { mode, mapped }
 	}
 
