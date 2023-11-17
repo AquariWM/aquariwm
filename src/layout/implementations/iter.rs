@@ -6,60 +6,39 @@ use std::{collections::vec_deque, iter::FusedIterator};
 
 use super::*;
 
+/// A wrapper around either `Iter` or <code>[Rev]\<Iter></code>.
+///
+/// [Rev]: std::iter::Rev
 enum GroupIterator<Iter: Iterator> {
 	Normal(Iter),
 	Rev(std::iter::Rev<Iter>),
 }
 
-pub struct FlatIter<'group, Window> {
+/// A borrowing iterator over the children of a [group].
+///
+/// This is returned by [`GroupNode::iter()`].
+///
+/// [group]: GroupNode
+pub struct Iter<'group, Window> {
 	iter: GroupIterator<vec_deque::Iter<'group, Node<Window>>>,
 }
 
-pub struct FlatIntoIter<Window> {
+/// An owning iterator over the children of a [group].
+///
+/// This is returned by [`GroupNode::into_iter()`].
+///
+/// [group]: GroupNode
+pub struct IntoIter<Window> {
 	into_iter: GroupIterator<vec_deque::IntoIter<Node<Window>>>,
 }
 
-pub struct FlatIterMut<'group, Window> {
+/// A mutably borrowing iterator over the children of a [group].
+///
+/// This is returned by [`GroupNode::iter_mut()`].
+///
+/// [group]: GroupNode
+pub struct IterMut<'group, Window> {
 	iter_mut: GroupIterator<vec_deque::IterMut<'group, Node<Window>>>,
-}
-
-pub struct DepthIterMut<'group, Window> {
-	nested: Option<(Box<DepthIterMut<'group, Window>>, &'group mut Node<Window>)>,
-	iter: FlatIterMut<'group, Window>,
-}
-
-impl<'group, Window> DepthIterMut<'group, Window> {
-	fn new(group: &'group mut GroupNode<Window>) -> Self {
-		Self {
-			nested: None,
-			iter: group.iter_mut(),
-		}
-	}
-}
-
-impl<'group, Window> Iterator for DepthIterMut<'group, Window> {
-	type Item = &'group Node<Window>;
-
-	fn next(&mut self) -> Option<Self::Item> {
-		if let Some(nested) = self.nested.as_mut() {
-			if let Some(node) = nested.0.next() {
-				Some(node)
-			} else {
-				Some(nested.1)
-			}
-		} else if let Some(next) = self.iter.next() {
-			match next {
-				Node::Group(group) => {
-					self.nested = Some((Box::new(DepthIterMut::new(group)), next));
-					self.next()
-				},
-
-				window_node => Some(window_node),
-			}
-		} else {
-			None
-		}
-	}
 }
 
 macro_rules! impl_iterator {
@@ -92,7 +71,7 @@ macro_rules! impl_iterator {
 		})?
 
 		////////////////////////////////////////////////////////////////////////////////////////////
-		// `Iter` impls
+		// $Iter impls
 		////////////////////////////////////////////////////////////////////////////////////////////
 
 		impl<$($lt,)? $Window> $Iter<$($lt,)? $Window> {
@@ -102,7 +81,7 @@ macro_rules! impl_iterator {
 						GroupIterator::Normal(group.nodes.$iter())
 					} else {
 						GroupIterator::Rev(group.nodes.$iter().rev())
-					}
+					},
 				}
 			}
 		}
@@ -193,19 +172,17 @@ macro_rules! impl_iterator {
 
 		impl<$($lt,)? $Window> FusedIterator for $Iter<$($lt,)? $Window> {}
 	};
-
-
 }
 
 impl_iterator! {
-	for FlatIter<'group, Window> { iter };
+	for Iter<'group, Window> { iter };
 
-	for FlatIntoIter<Window> { into_iter } {
+	for IntoIter<Window> { into_iter } {
 		/// Returns an owning iterator over the direct children of this group.
 		fn into_iter(self) -> Self::IntoIter;
 	}
 
-	for FlatIterMut<'group mut, Window> { iter_mut };
+	for IterMut<'group mut, Window> { iter_mut };
 }
 
 impl<Window> GroupNode<Window> {
