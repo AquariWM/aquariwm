@@ -41,12 +41,6 @@ jobs:
             -   name: Checkout AquariWM
                 uses: actions/checkout@v3
 
-            # Add the `pkg-config` path to `PKG_CONFIG_PATH` so `libudev-sys` can find `libudev`.
-            -   name: Add Ubuntu pkg-config path to PKG_CONFIG_PATH
-                run: |
-                    echo 'export PKG_CONFIG_PATH="/usr/lib/x86-64-linux-gnu/pkgconfig/"' >> $HOME/.bashrc
-                    source $HOME/.bashrc
-
             # Install the latest nightly release of the Rust toolchain.
             -   name: Install latest nightly
                 uses: actions-rs/toolchain@v1
@@ -112,12 +106,6 @@ jobs:
                 with:
                     ref: ${{ needs.fix-n-format.outputs.commit-id }}
 
-            # Add the `pkg-config` path to `PKG_CONFIG_PATH` so `libudev-sys` can find `libudev`.
-            -   name: Add Ubuntu pkg-config path to PKG_CONFIG_PATH
-                run: |
-                    echo 'export PKG_CONFIG_PATH="/usr/lib/x86-64-linux-gnu/pkgconfig/"' >> $HOME/.bashrc
-                    source $HOME/.bashrc
-
             # Install the latest nightly release of the Rust toolchain.
             -   name: Install latest nightly
                 uses: actions-rs/toolchain@v1
@@ -152,12 +140,6 @@ jobs:
                 uses: actions/checkout@v3
                 with:
                     ref: ${{ needs.fix-n-format.outputs.commit-id }}
-
-            # Add the `pkg-config` path to `PKG_CONFIG_PATH` so `libudev-sys` can find `libudev`.
-            -   name: Add Ubuntu pkg-config path to PKG_CONFIG_PATH
-                run: |
-                    echo 'export PKG_CONFIG_PATH="/usr/lib/x86-64-linux-gnu/pkgconfig/"' >> $HOME/.bashrc
-                    source $HOME/.bashrc
 
             # Install the latest nightly release of the Rust toolchain.
             -   name: Install latest nightly
@@ -196,12 +178,6 @@ jobs:
                 with:
                     ref: ${{ needs.fix-n-format.outputs.commit-id }}
                     path: aquariwm
-
-            # Add the `pkg-config` path to `PKG_CONFIG_PATH` so `libudev-sys` can find `libudev`.
-            -   name: Add Ubuntu pkg-config path to PKG_CONFIG_PATH
-                run: |
-                    echo 'export PKG_CONFIG_PATH="/usr/lib/x86-64-linux-gnu/pkgconfig/"' >> $HOME/.bashrc
-                    source $HOME/.bashrc
 
             # Check out a template to put the generated docs in.
             -   name: Checkout AquariWM docs template
