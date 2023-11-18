@@ -4,13 +4,15 @@
 
 use super::*;
 
-pub struct Stack<Window: Send + Sync + 'static>(TilingLayout<Window>);
+pub struct Stack<Window: Send + Sync + PartialEq + 'static> {
+	layout: TilingLayout<Window>,
+}
 
 #[allow(unused)]
-impl<Window: Send + Sync + 'static> Stack<Window> {
+impl<Window: Send + Sync + PartialEq + 'static> Stack<Window> {
 	/// Returns a shared reference to the main window, if there is one.
 	fn main(&self) -> Option<&WindowNode<Window>> {
-		self.layout().first().and_then(|node| match node {
+		self.layout.first().and_then(|node| match node {
 			Node::Group(_) => None,
 			Node::Window(node) => Some(node),
 		})
@@ -18,7 +20,7 @@ impl<Window: Send + Sync + 'static> Stack<Window> {
 
 	/// Returns a shared reference to the stack, if there is one.
 	fn stack(&self) -> Option<&GroupNode<Window>> {
-		self.layout().get(1).and_then(|node| match node {
+		self.layout.get(1).and_then(|node| match node {
 			Node::Group(node) => Some(node),
 			Node::Window(_) => None,
 		})
@@ -26,7 +28,7 @@ impl<Window: Send + Sync + 'static> Stack<Window> {
 
 	/// Returns a mutable reference to the main window, if there is one.
 	fn main_mut(&mut self) -> Option<&mut WindowNode<Window>> {
-		self.layout_mut().first_mut().and_then(|node| match node {
+		self.layout.first_mut().and_then(|node| match node {
 			Node::Group(_) => None,
 			Node::Window(node) => Some(node),
 		})
@@ -34,14 +36,18 @@ impl<Window: Send + Sync + 'static> Stack<Window> {
 
 	/// Returns a mutable reference to the stack, if there is one.
 	fn stack_mut(&mut self) -> Option<&mut GroupNode<Window>> {
-		self.layout_mut().get_mut(1).and_then(|node| match node {
+		self.layout.get_mut(1).and_then(|node| match node {
 			Node::Group(node) => Some(node),
 			Node::Window(_) => None,
 		})
 	}
 }
 
-unsafe impl<Window: Send + Sync + 'static> TilingLayoutManager<Window> for Stack<Window> {
+unsafe impl<Window> TilingLayoutManager<Window> for Stack<Window>
+where
+	Window: Send + Sync + PartialEq + 'static,
+{
+	#[inline(always)]
 	fn orientation() -> Orientation
 	where
 		Self: Sized,
@@ -55,31 +61,32 @@ unsafe impl<Window: Send + Sync + 'static> TilingLayoutManager<Window> for Stack
 		WindowsIter: IntoIterator<Item = Window>,
 		WindowsIter::IntoIter: ExactSizeIterator,
 	{
-		let mut stack_layout = Self(layout);
-		let layout = &mut stack_layout.0;
+		let mut stack = Self { layout };
 
 		let mut windows = windows.into_iter();
 
 		if let Some(main) = windows.next() {
-			layout.push_window_back(main);
+			stack.layout.push_window_back(main);
 
 			// If there are more windows, then add them in a stack.
 			if windows.len() > 0 {
-				layout.push_group_back_with(Orientation::TopToBottom, |stack| stack.push_windows_back(windows));
+				stack
+					.layout
+					.push_group_back_with(Orientation::TopToBottom, |stack| stack.push_windows_back(windows));
 			}
 		}
 
-		stack_layout
+		stack
 	}
 
 	#[inline(always)]
 	fn layout(&self) -> &TilingLayout<Window> {
-		&self.0
+		&self.layout
 	}
 
 	#[inline(always)]
 	fn layout_mut(&mut self) -> &mut TilingLayout<Window> {
-		&mut self.0
+		&mut self.layout
 	}
 
 	fn add_window(&mut self, window: Window) {
@@ -102,7 +109,43 @@ unsafe impl<Window: Send + Sync + 'static> TilingLayoutManager<Window> for Stack
 		}
 	}
 
-	fn remove_window(&mut self, _window: &Window) {
-		todo!("Need to implement iterators for groups first.")
+	fn remove_window(&mut self, window: &Window) {
+		if let Some(main) = self.main() {
+			if main.window() == window {
+				if let Some(Node::Window(new_main)) = self.stack_mut().and_then(|stack| stack.remove(0)) {
+					// If there is a window to replace the main window with, do that.
+
+					self.main_mut()
+						.expect("We've already established `main` is present.")
+						.set_window(new_main.unwrap());
+				} else {
+					// Otherwise, if there is no window to replace the main window with, remove the
+					// node.
+
+					self.layout.remove(0);
+				}
+
+				return;
+			}
+		}
+
+		// Otherwise, if the main window does not match...
+
+		// If there is a stack...
+		if let Some(stack) = self.stack() {
+			// For each window in the stack...
+			for i in 0..stack.len() {
+				if let Node::Window(stack_node) = &stack[i] {
+					// If the window matches, remove it and return.
+					if stack_node.window() == window {
+						self.stack_mut()
+							.expect("We've already established the stack is present.")
+							.remove(i);
+
+						return;
+					}
+				}
+			}
+		}
 	}
 }
