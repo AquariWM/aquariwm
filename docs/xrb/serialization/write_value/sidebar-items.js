@@ -1,1 +1,0 @@
-initSidebarItems({"macro":[["writer","Implements [`WriteValue`] for multiple primitive types that can cast to `u8`, `u16` and `u32`."]],"trait":[["WriteValue","Write a value as a 1-byte, 2-byte, or 4-byte unsigned integer ([`u8`], [`u16`], or [`u32`])."]]});

@@ -1,1 +1,0 @@
-initSidebarItems({"mod":[["atoms","Atom constants that are predefined in the X11 protocol."],["bitmasks",""],["common",""],["ids",""],["messages",""]]});

@@ -1,1 +1,0 @@
-initSidebarItems({"struct":[["Access",""],["Alloc",""],["Atom",""],["Colormap",""],["Cursor",""],["Drawable",""],["Font",""],["GContext",""],["IdChoice",""],["Implementation",""],["Length",""],["Match",""],["Name",""],["Pixmap",""],["Request",""],["Value",""],["Window",""]],"trait":[["Error",""]]});
