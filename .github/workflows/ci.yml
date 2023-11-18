@@ -41,12 +41,12 @@ jobs:
             -   name: Checkout AquariWM
                 uses: actions/checkout@v3
 
-            # Install `libudev-dev` and `libseat-dev` to satisfy the `libudev-sys` and `libseat-sys`
-            # crates' dependencies.
-            -   name: Install libudev-dev and libseat-dev
+            # Install `libsystemd-dev` to satisfy the `libudev-sys` and `libseat-sys` crates'
+            # dependencies.
+            -   name: Install libsystemd-dev
                 run: |
                     sudo apt-get update
-                    sudo apt-get install libudev-dev libseat-dev
+                    sudo apt-get install libsystemd-dev
 
             # Install the latest nightly release of the Rust toolchain.
             -   name: Install latest nightly
@@ -113,12 +113,12 @@ jobs:
                 with:
                     ref: ${{ needs.fix-n-format.outputs.commit-id }}
 
-            # Install `libudev-dev` and `libseat-dev` to satisfy the `libudev-sys` and `libseat-sys`
-            # crates' dependencies.
-            -   name: Install libudev-dev and libseat-dev
+            # Install `libsystemd-dev` to satisfy the `libudev-sys` and `libseat-sys` crates'
+            # dependencies.
+            -   name: Install libsystemd-dev
                 run: |
                     sudo apt-get update
-                    sudo apt-get install libudev-dev libseat-dev
+                    sudo apt-get install libsystemd-dev
 
             # Install the latest nightly release of the Rust toolchain.
             -   name: Install latest nightly
@@ -155,12 +155,12 @@ jobs:
                 with:
                     ref: ${{ needs.fix-n-format.outputs.commit-id }}
 
-            # Install `libudev-dev` and `libseat-dev` to satisfy the `libudev-sys` and `libseat-sys`
-            # crates' dependencies.
-            -   name: Install libudev-dev and libseat-dev
+            # Install `libsystemd-dev` to satisfy the `libudev-sys` and `libseat-sys` crates'
+            # dependencies.
+            -   name: Install libsystemd-dev
                 run: |
                     sudo apt-get update
-                    sudo apt-get install libudev-dev libseat-dev
+                    sudo apt-get install libsystemd-dev
 
             # Install the latest nightly release of the Rust toolchain.
             -   name: Install latest nightly
@@ -200,12 +200,12 @@ jobs:
                     ref: ${{ needs.fix-n-format.outputs.commit-id }}
                     path: aquariwm
 
-            # Install `libudev-dev` and `libseat-dev` to satisfy the `libudev-sys` and `libseat-sys`
-            # crates' dependencies.
-            -   name: Install libudev-dev and libseat-dev
+            # Install `libsystemd-dev` to satisfy the `libudev-sys` and `libseat-sys` crates'
+            # dependencies.
+            -   name: Install libsystemd-dev
                 run: |
                     sudo apt-get update
-                    sudo apt-get install libudev-dev libseat-dev
+                    sudo apt-get install libsystemd-dev
 
             # Check out a template to put the generated docs in.
             -   name: Checkout AquariWM docs template
