@@ -186,6 +186,60 @@ impl<Window> WindowNode<Window> {
 	pub(crate) const fn with_dimensions(window: Window, width: u32, height: u32) -> Self {
 		Self { window, width, height }
 	}
+
+	/// Returns a reference to the window node's window.
+	#[inline(always)]
+	pub const fn window(&self) -> &Window {
+		&self.window
+	}
+
+	/// Returns a mutable reference to the window node's window.
+	#[inline(always)]
+	pub fn window_mut(&mut self) -> &mut Window {
+		&mut self.window
+	}
+
+	/// Sets the window node's window to the given `window`.
+	#[inline(always)]
+	pub fn set_window(&mut self, window: Window) {
+		self.window = window;
+	}
+
+	/// Returns the window node's window.
+	#[inline(always)]
+	pub fn unwrap(self) -> Window {
+		self.window
+	}
+}
+
+impl<Window> Deref for WindowNode<Window> {
+	type Target = Window;
+
+	#[inline(always)]
+	fn deref(&self) -> &Self::Target {
+		&self.window
+	}
+}
+
+impl<Window> DerefMut for WindowNode<Window> {
+	#[inline(always)]
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		&mut self.window
+	}
+}
+
+impl<Window> Borrow<Window> for WindowNode<Window> {
+	#[inline(always)]
+	fn borrow(&self) -> &Window {
+		self
+	}
+}
+
+impl<Window> BorrowMut<Window> for WindowNode<Window> {
+	#[inline(always)]
+	fn borrow_mut(&mut self) -> &mut Window {
+		self
+	}
 }
 
 impl<Window> GroupNode<Window> {
@@ -223,7 +277,7 @@ impl<Window> GroupNode<Window> {
 	/// that itself has children is still going to have a `len` of 1.
 	///
 	/// [nodes]: Node
-	#[inline]
+	#[inline(always)]
 	pub fn len(&self) -> usize {
 		self.children.len()
 	}
@@ -231,7 +285,7 @@ impl<Window> GroupNode<Window> {
 	/// Returns [`true`] if there are no [nodes] in the group.
 	///
 	/// [nodes]: Node
-	#[inline]
+	#[inline(always)]
 	pub fn is_empty(&self) -> bool {
 		self.children.is_empty()
 	}
