@@ -224,7 +224,7 @@ jobs:
 
             # Matches errors, warnings, etc. so annotations can be added and such.
             -   name: Add Rust problem matching
-                run: echo "::add-matcher::xrb/.github/rustc-problem-matcher.json"
+                run: echo "::add-matcher::aquariwm/.github/rustc-problem-matcher.json"
 
             # Setup GitHub Pages to easily deploy to it.
             -   name: Setup GitHub Pages
@@ -232,7 +232,7 @@ jobs:
 
             # Build documentation with `rustdoc`.
             -   name: Build documentation
-                working-directory: xrb
+                working-directory: aquariwm
                 run: cargo doc --no-deps --workspace --color never
 
             -   name: Remove Rust problem matching
