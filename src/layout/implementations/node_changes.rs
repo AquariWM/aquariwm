@@ -53,15 +53,26 @@ impl<Window> GroupNode<Window> {
 	///
 	/// [node]: Node
 	pub fn remove(&mut self, index: usize) -> Option<Node<Window>> {
-		let node = self.children.remove(index);
+		if index < self.children.len() {
+			let index = if !self.orientation.reversed() {
+				index
+			} else {
+				let last = self.children.len() - 1;
+				last - index
+			};
 
-		if let Some(node) = &node {
-			self.track_remove(index);
+			let node = self.children.remove(index);
 
-			self.total_removed_primary += node.primary(self.orientation.axis());
+			if let Some(node) = &node {
+				self.track_remove(index);
+
+				self.total_removed_primary += node.primary(self.orientation.axis());
+			}
+
+			node
+		} else {
+			None
 		}
-
-		node
 	}
 
 	/// Pushes a new [window node] with the given `window` to the end of the group.
