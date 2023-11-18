@@ -1,0 +1,241 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+# Runs checks, tests, code analysis, auto-formats code, applies recommended
+# fixes, and publishes documentation.
+name: Continuous integration
+
+on: [ push, pull_request ]
+
+permissions:
+    contents: write
+    pages: write
+    id-token: write
+
+jobs:
+    cancel-runs:
+        runs-on: ubuntu-latest
+
+        steps:
+            # If this workflow is already in progress or queued, we cancel it; we are
+            # about to do the exact same tests and documentation on potentially new
+            # code, so it is pointless to continue them.
+            -   name: Cancel existing workflow runs
+                uses: styfle/cancel-workflow-action@0.11.0
+                with:
+                    access_token: ${{ github.token }}
+
+    # Automatically applies suggested fixes from `clippy` and formats with rustfmt.
+    fix-n-format:
+        runs-on: ubuntu-latest
+        continue-on-error: true
+
+        outputs:
+            # The ID of the commit made for the fixes, or, if no fixes were applied,
+            # the commit that triggered the workflow.
+            commit-id: ${{ steps.commit-id.outputs.COMMIT_ID }}
+
+        steps:
+            # Check out (a.k.a. clones) the AquariWM repository.
+            -   name: Checkout AquariWM
+                uses: actions/checkout@v3
+
+            # Install the latest nightly release of the Rust toolchain.
+            -   name: Install latest nightly
+                uses: actions-rs/toolchain@v1
+                with:
+                    profile: minimal
+                    toolchain: nightly
+                    override: true
+                    components: clippy, rustfmt
+
+            -   name: Configure git credentials
+                run: |
+                    git config user.name github-actions
+                    git config user.email github-actions@github.com
+
+            # Apply fixes with `clippy`.
+            -   name: Apply recommended fixes
+                uses: actions-rs/cargo@v1
+                with:
+                    command: clippy
+                    args: --workspace --fix --color always
+
+            -   name: Commit clippy fix changes
+                # Commit changes, or, if that fails, do nothing.
+                run: |
+                    git pull origin ${{ github.ref }}
+                    git diff --quiet || echo "### Applied recommended clippy fixes." >> $GITHUB_STEP_SUMMARY
+                    git diff --quiet || (git commit -am "[CI${{ github.run_number}}] applied recommended clippy fixes" && echo "$(git log --format='%H' -n 1)" >> $GITHUB_STEP_SUMMARY && echo "$(git log --format='%H' -n 1)" >> .git-blame-ignore-revs)
+
+            # Automatically format the code with `rustfmt`.
+            -   name: Format code with `rustfmt`
+                uses: actions-rs/cargo@v1
+                with:
+                    command: fmt
+                    args: --all
+
+            -   name: Commit rustfmt changes
+                run: |
+                    git pull origin ${{ github.ref }}
+                    git diff --quiet || echo "### Formatted code with rustfmt." >> $GITHUB_STEP_SUMMARY
+                    git diff --quiet || (git commit -am "[CI${{ github.run_number}}] formatted code with rustfmt" && echo "$(git log --format='%H' -n 1)" >> $GITHUB_STEP_SUMMARY && echo "$(git log --format='%H' -n 1)" >> .git-blame-ignore-revs)
+
+            # This sets the `commit-id` to the latest commit. If there were changes
+            # made, that means it will be the commit for those changes, otherwise it
+            # will be the commit that triggered the workflow.
+            -   name: Set the `commit-id` output
+                id: commit-id
+                run: echo "COMMIT_ID=$(git log --format='%H' -n 1)" >> $GITHUB_OUTPUT
+
+            -   name: Push changes
+                run: |
+                    git push origin HEAD:${{ github.ref }} || :
+
+    # Runs unit tests.
+    run-tests:
+        needs: fix-n-format
+        if: success() || failure()
+        runs-on: ubuntu-latest
+
+        steps:
+            # Check out (a.k.a. clones) the AquariWM repository.
+            -   name: Checkout AquariWM
+                uses: actions/checkout@v3
+                with:
+                    ref: ${{ needs.fix-n-format.outputs.commit-id }}
+
+            # Install the latest nightly release of the Rust toolchain.
+            -   name: Install latest nightly
+                uses: actions-rs/toolchain@v1
+                with:
+                    profile: minimal
+                    toolchain: nightly
+                    override: true
+
+            # Matches test failures so annotations can be added and such.
+            -   name: Add test problem matching
+                run: echo "::add-matcher::.github/test-problem-matcher.json"
+
+            # Run unit tests with `cargo test`.
+            -   name: Run tests
+                run: cargo test --workspace --color never
+
+            -   name: Remove test problem matching
+                if: ${{ success() || failure() }}
+                run: echo "::remove-matcher owner=rust-tests::"
+
+    # Analyses the code with `clippy`.
+    clippy-analysis:
+        runs-on: ubuntu-latest
+        # We run clippy analysis after any fixes that can be applied have been.
+        needs: fix-n-format
+        if: success() || failure()
+
+        steps:
+            # Check out (a.k.a. clones) the AquariWM repository with fixes made by `clippy`
+            # in `clippy-fixes`, if any.
+            -   name: Checkout AquariWM
+                uses: actions/checkout@v3
+                with:
+                    ref: ${{ needs.fix-n-format.outputs.commit-id }}
+
+            # Install the latest nightly release of the Rust toolchain.
+            -   name: Install latest nightly
+                uses: actions-rs/toolchain@v1
+                with:
+                    profile: minimal
+                    toolchain: nightly
+                    override: true
+                    components: clippy
+
+            # Matches errors, warnings, etc. so annotations can be added and such.
+            -   name: Add Rust problem matching
+                run: echo "::add-matcher::.github/rustc-problem-matcher.json"
+
+            # Analyse the code with `clippy`.
+            -   name: Clippy analysis
+                run: cargo clippy --workspace --color never
+
+            -   name: Remove Rust problem matching
+                if: ${{ success() || failure() }}
+                run: echo "::remove-matcher owner=rustc::"
+
+    # Generate the docs with rustdoc.
+    build-docs:
+        runs-on: ubuntu-latest
+        # We only build the documentation after the code has been changed so that
+        # the code sources linked in the documentation are up-to-date.
+        needs: fix-n-format
+        if: success() || failure()
+
+        steps:
+            # Check out (a.k.a. clones) the AquariWM repository with fixes made by `clippy`
+            # in `clippy-fixes`, if any, and formatting made by `rustfmt` in
+            # `auto-format`, if any.
+            -   name: Checkout AquariWM
+                uses: actions/checkout@v3
+                with:
+                    ref: ${{ needs.fix-n-format.outputs.commit-id }}
+                    path: aquariwm
+
+            # Check out a template to put the generated docs in.
+            -   name: Checkout AquariWM docs template
+                uses: actions/checkout@v3
+                with:
+                    repository: AquariWM/aquariwm-docs-template
+                    path: template
+
+            # Install the Rust toolchain so that docs can be generated.
+            -   name: Install latest nightly
+                uses: actions-rs/toolchain@v1
+                with:
+                    profile: minimal
+                    toolchain: nightly
+                    override: true
+
+            # Matches errors, warnings, etc. so annotations can be added and such.
+            -   name: Add Rust problem matching
+                run: echo "::add-matcher::xrb/.github/rustc-problem-matcher.json"
+
+            # Setup GitHub Pages to easily deploy to it.
+            -   name: Setup GitHub Pages
+                uses: actions/configure-pages@v2
+
+            # Build documentation with `rustdoc`.
+            -   name: Build documentation
+                working-directory: xrb
+                run: cargo doc --no-deps --workspace --color never
+
+            -   name: Remove Rust problem matching
+                if: ${{ success() || failure() }}
+                run: echo "::remove-matcher owner=rustc::"
+
+            # Place the built documentation into the template, ready to be deployed.
+            -   name: Move generated docs into docs template
+                run: mv aquariwm/target/doc template/doc
+
+            # Upload the template, now containing the built docs, as an artifact that
+            # can be accessed by the `deploy-docs` job.
+            -   name: Upload GitHub Pages artifact
+                uses: actions/upload-pages-artifact@v1
+                with:
+                    path: template
+
+    # Deploy the documentation with GitHub Pages.
+    deploy-docs:
+        if: github.event_name == 'push' && github.ref_type == 'branch' && github.ref_name == 'main'
+        environment:
+            name: github-pages
+            url: ${{ steps.deployment.outputs.page_url }}
+
+        runs-on: ubuntu-latest
+        # Can't deploy the documentation until it exists!
+        needs: build-docs
+
+        steps:
+            # Deploys the documentation to GitHub Pages using the artifact (stored
+            # but not committed changes for Actions) saved earlier.
+            -   name: Deploy documentation to GitHub Pages
+                uses: actions/deploy-pages@v1
