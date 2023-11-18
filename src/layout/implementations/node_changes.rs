@@ -626,8 +626,13 @@ mod tests {
 		assert_eq!(reversed_group.children, reversed_nodes);
 	}
 
+	/// Tests [`apply_changes`] in response to adding and removing windows and changing the group
+	/// [`orientation`].
+	///
+	/// [`apply_changes`]: GroupNode::apply_changes
+	/// [`orientation`]: GroupNode::orientation()
 	#[test]
-	fn resize_additions() {
+	fn resizing() {
 		// No-op resize_window function to pass to `apply_changes`.
 		const fn resize_window(_window: &u32, _primary: u32, _secondary: u32) -> Result<(), ()> {
 			Ok(())
@@ -638,6 +643,12 @@ mod tests {
 
 		// The width of each node after three nodes have been added.
 		const THREE_NODES_WIDTH: u32 = GROUP_WIDTH / 3;
+		// The width of each node after two nodes have been added.
+		const TWO_NODES_WIDTH: u32 = GROUP_WIDTH / 2;
+
+		// The height of each node after two nodes have been added and the axis has been set to
+		// vertical.
+		const TWO_NODES_HEIGHT: u32 = GROUP_HEIGHT / 2;
 
 		let mut group: GroupNode<u32> = GroupNode::with_dimensions(Orientation::LeftToRight, GROUP_WIDTH, GROUP_HEIGHT);
 
@@ -650,10 +661,10 @@ mod tests {
 					width: 0,
 					height: 0,
 					..
-				})
+				}),
 			),
 			"node = {:?}",
-			&group[0]
+			&group[0],
 		);
 
 		// Resize the added window.
@@ -666,10 +677,10 @@ mod tests {
 					width: GROUP_WIDTH,
 					height: GROUP_HEIGHT,
 					..
-				})
+				}),
 			),
 			"node = {:?}",
-			&group[0]
+			&group[0],
 		);
 
 		group.push_windows_back([2, 3]);
@@ -677,15 +688,65 @@ mod tests {
 		// Resize the existing window and two added windows.
 		group.apply_changes(resize_window).unwrap();
 
-		for node in group {
+		for node in &group {
 			assert!(
 				matches!(
-					&node,
+					node,
 					Node::Window(WindowNode {
 						width: THREE_NODES_WIDTH,
 						height: GROUP_HEIGHT,
 						..
-					})
+					}),
+				),
+				"node = {:?}",
+				node,
+			);
+		}
+
+		// Remove the first node.
+		group.remove(0);
+
+		// Resize the two remaining windows.
+		group.apply_changes(resize_window).unwrap();
+
+		for node in &group {
+			assert!(
+				matches!(
+					node,
+					Node::Window(WindowNode {
+						width: TWO_NODES_WIDTH,
+						height: GROUP_HEIGHT,
+						..
+					}),
+				),
+				"node = {:?}",
+				node,
+			);
+		}
+
+		let mut clone = group.clone();
+
+		// Add a window and immediately remove it.
+		clone.push_window_front(1);
+		clone.remove(0);
+		// Apply the changes (of which there should be none).
+		clone.apply_changes(resize_window).unwrap();
+
+		assert_eq!(group, clone);
+
+		group.set_orientation(Orientation::TopToBottom);
+		// Apply the orientation change.
+		group.apply_changes(resize_window).unwrap();
+
+		for node in &group {
+			assert!(
+				matches!(
+					node,
+					Node::Window(WindowNode {
+						width: GROUP_WIDTH,
+						height: TWO_NODES_HEIGHT,
+						..
+					}),
 				),
 				"node = {:?}",
 				node
