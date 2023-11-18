@@ -41,6 +41,13 @@ jobs:
             -   name: Checkout AquariWM
                 uses: actions/checkout@v3
 
+            # Install `systemd` to satisfy `libudev-sys` dependency on `libudev` (which is provided
+            # by `systemd`).
+            -   name: Install systemd
+                run: |
+                    sudo apt-get update
+                    sudo apt-get install systemd
+
             # Install the latest nightly release of the Rust toolchain.
             -   name: Install latest nightly
                 uses: actions-rs/toolchain@v1
@@ -106,6 +113,13 @@ jobs:
                 with:
                     ref: ${{ needs.fix-n-format.outputs.commit-id }}
 
+            # Install `systemd` to satisfy `libudev-sys` dependency on `libudev` (which is provided
+            # by `systemd`).
+            -   name: Install systemd
+                run: |
+                    sudo apt-get update
+                    sudo apt-get install systemd
+
             # Install the latest nightly release of the Rust toolchain.
             -   name: Install latest nightly
                 uses: actions-rs/toolchain@v1
@@ -141,6 +155,13 @@ jobs:
                 with:
                     ref: ${{ needs.fix-n-format.outputs.commit-id }}
 
+            # Install `systemd` to satisfy `libudev-sys` dependency on `libudev` (which is provided
+            # by `systemd`).
+            -   name: Install systemd
+                run: |
+                    sudo apt-get update
+                    sudo apt-get install systemd
+
             # Install the latest nightly release of the Rust toolchain.
             -   name: Install latest nightly
                 uses: actions-rs/toolchain@v1
@@ -171,14 +192,20 @@ jobs:
         if: success() || failure()
 
         steps:
-            # Check out (a.k.a. clones) the AquariWM repository with fixes made by `clippy`
-            # in `clippy-fixes`, if any, and formatting made by `rustfmt` in
-            # `auto-format`, if any.
+            # Check out (a.k.a. clones) the AquariWM repository with fixes made by `clippy` in
+            # `clippy-fixes`, if any, and formatting made by `rustfmt` in `auto-format`, if any.
             -   name: Checkout AquariWM
                 uses: actions/checkout@v3
                 with:
                     ref: ${{ needs.fix-n-format.outputs.commit-id }}
                     path: aquariwm
+
+            # Install `systemd` to satisfy `libudev-sys` dependency on `libudev` (which is provided
+            # by `systemd`).
+            -   name: Install systemd
+                run: |
+                    sudo apt-get update
+                    sudo apt-get install systemd
 
             # Check out a template to put the generated docs in.
             -   name: Checkout AquariWM docs template
