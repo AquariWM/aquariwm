@@ -101,8 +101,7 @@ impl<Window> GroupNode<Window> {
 	/// [window node]: WindowNode
 	#[inline]
 	pub fn insert_window(&mut self, index: usize, window: Window) {
-		self.children.insert(index, Node::new_window(window));
-		self.track_insert(index);
+		self.insert_node(index, Node::new_window(window));
 	}
 
 	/// Inserts new [window nodes] of the given `windows` at the given `index` in the group.
@@ -644,14 +643,18 @@ mod tests {
 
 		group.push_window_back(1);
 
-		assert!(matches!(
-			&group[0],
-			Node::Window(WindowNode {
-				width: 0,
-				height: 0,
-				..
-			})
-		));
+		assert!(
+			matches!(
+				&group[0],
+				Node::Window(WindowNode {
+					width: 0,
+					height: 0,
+					..
+				})
+			),
+			"node = {:?}",
+			&group[0]
+		);
 
 		// Resize the added window.
 		group.apply_changes(resize_window).unwrap();
