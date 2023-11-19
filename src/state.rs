@@ -4,7 +4,6 @@
 
 use std::{collections::HashMap, hash::Hash};
 
-use cfg_attrs::cfg_attrs;
 #[cfg(feature = "async")]
 use {futures::future, std::future::Future};
 
@@ -138,7 +137,7 @@ impl<Window: Eq + Hash + Clone> AquariWm<Window> {
 	///
 	/// In order to apply any changes that may have been made to the tiling layout,
 	/// [`apply_changes`]
-	#[cfg_attrs(feature = "async", /** or [`apply_changes_async`](Self::apply_changes_async) */)]
+	#[cfg_attr(feature = "async", doc = "or [`apply_changes_async`](Self::apply_changes_async)")]
 	/// must be called.
 	///
 	/// [`apply_changes`]: Self::apply_changes
@@ -159,7 +158,7 @@ impl<Window: Eq + Hash + Clone> AquariWm<Window> {
 	///
 	/// In order to apply any changes that may have been made to the tiling layout,
 	/// [`apply_changes`]
-	#[cfg_attrs(feature = "async", /** or [`apply_changes_async`](Self::apply_changes_async) */)]
+	#[cfg_attr(feature = "async", doc = "or [`apply_changes_async`](Self::apply_changes_async)")]
 	/// must be called.
 	///
 	/// [mapped]: MapState::Mapped
@@ -183,7 +182,7 @@ impl<Window: Eq + Hash + Clone> AquariWm<Window> {
 	///
 	/// In order to apply any changes that may have been made to the tiling layout,
 	/// [`apply_changes`]
-	#[cfg_attrs(feature = "async", /** or [`apply_changes_async`](Self::apply_changes_async) */)]
+	#[cfg_attr(feature = "async", doc = "or [`apply_changes_async`](Self::apply_changes_async)")]
 	/// must be called.
 	///
 	/// [unmapped]: MapState::Unmapped
@@ -208,14 +207,15 @@ impl<Window: Eq + Hash + Clone> AquariWm<Window> {
 	///
 	/// [layout manager]: layout::TilingLayoutManager
 	/// [`apply_resizes`]: layout::GroupNode::apply_resizes
-	#[cfg_attrs(
-	feature = "async",
-	///
-	/// # See also
-	/// [`apply_changes_async`] allows using a `resize_window` function that returns a [future].
-	///
-	/// [`apply_changes_async`]: Self::apply_changes_async
-	/// [future]: Future
+	#[cfg_attr(
+		feature = "async",
+		doc = "",
+		doc = " # See also",
+		doc = "[`apply_changes_async`] allows using a `resize_window` function that returns a",
+		doc = "[future].",
+		doc = "",
+		doc = "[`apply_changes_async`]: Self::apply_changes_async",
+		doc = "[future]: Future"
 	)]
 	pub fn apply_changes<Error>(
 		&mut self,
@@ -228,6 +228,7 @@ impl<Window: Eq + Hash + Clone> AquariWm<Window> {
 		Ok(())
 	}
 
+	#[doc(cfg(feature = "async"))]
 	/// Applies changes made by the [layout manager] by calling `apply_changes` with the given
 	/// `resize_window` function.
 	///

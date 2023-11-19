@@ -6,6 +6,7 @@
 // Feature flags
 #![feature(impl_trait_in_assoc_type)]
 #![feature(iterator_try_collect)]
+#![feature(doc_cfg)]
 
 use std::{env, ffi::OsString, io, process};
 

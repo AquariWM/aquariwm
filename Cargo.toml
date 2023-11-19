@@ -30,7 +30,6 @@ async = ["dep:futures", "dep:tokio"]
 bitflags = "2.2.1"
 thiserror = "1.0.50"
 truncate-integer = "0.5.0"
-cfg_attrs = "1"
 
 # CLI
 clap = { version = "4.4.7", features = ["derive"] }
