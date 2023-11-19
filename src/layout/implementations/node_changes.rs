@@ -77,6 +77,66 @@ impl<Window> GroupNode<Window> {
 		}
 	}
 
+	/// Removes the [node] at the end of the group.
+	///
+	/// [node]: Node
+	pub fn pop_back(&mut self) -> Option<Node<Window>> {
+		match self.children.len() {
+			// `children` is empty
+			0 => None,
+			// `children` is not empty
+			_ => {
+				if !self.orientation.reversed() {
+					let node = self.children.pop_back();
+
+					if node.is_some() {
+						self.track_pop_back();
+					}
+
+					node
+				} else {
+					let node = self.children.pop_front();
+
+					if node.is_some() {
+						self.track_pop_front();
+					}
+
+					node
+				}
+			},
+		}
+	}
+
+	/// Removes the [node] at the front of the group.
+	///
+	/// [node]: Node
+	pub fn pop_front(&mut self) -> Option<Node<Window>> {
+		match self.children.len() {
+			// `children` is empty
+			0 => None,
+			// `children` is not empty
+			_ => {
+				if !self.orientation.reversed() {
+					let node = self.children.pop_front();
+
+					if node.is_some() {
+						self.track_pop_front();
+					}
+
+					node
+				} else {
+					let node = self.children.pop_back();
+
+					if node.is_some() {
+						self.track_pop_back();
+					}
+
+					node
+				}
+			},
+		}
+	}
+
 	/// Pushes a new [window node] with the given `window` to the end of the group.
 	///
 	/// [window node]: WindowNode

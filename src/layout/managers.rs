@@ -115,15 +115,13 @@ where
 			if main.window() == window {
 				if let Some(Node::Window(new_main)) = self.stack_mut().and_then(|stack| stack.remove(0)) {
 					// If there is a window to replace the main window with, do that.
-
 					self.main_mut()
 						.expect("We've already established `main` is present.")
-						.set_window(new_main.unwrap());
+						.set_window(new_main.into_window());
 				} else {
 					// Otherwise, if there is no window to replace the main window with, remove the
 					// node.
-
-					self.layout.remove(0);
+					self.layout.pop_front();
 				}
 
 				return;
@@ -148,7 +146,7 @@ where
 						stack.remove(i);
 					} else {
 						// Otherwise, if it is the last window in the stack, remove the stack.
-						self.layout.remove(1);
+						self.layout.pop_back();
 					}
 
 					return;

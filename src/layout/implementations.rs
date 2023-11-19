@@ -263,7 +263,7 @@ impl<Window> WindowNode<Window> {
 
 	/// Returns the window node's window.
 	#[inline(always)]
-	pub fn unwrap(self) -> Window {
+	pub fn into_window(self) -> Window {
 		self.window
 	}
 }
