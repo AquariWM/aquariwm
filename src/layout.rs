@@ -158,6 +158,11 @@ pub struct GroupNode<Window> {
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct WindowNode<Window> {
 	window: Window,
+	/// Whether the `window` was changed in the latest [`add_window`] or [`remove_window`] call.
+	///
+	/// [`add_window`]: TilingLayoutManager::add_window
+	/// [`remove_window`]: TilingLayoutManager::remove_window
+	window_changed: bool,
 
 	width: u32,
 	height: u32,

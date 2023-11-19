@@ -4,6 +4,7 @@
 
 use std::{
 	borrow::{Borrow, BorrowMut},
+	mem,
 	ops::{Deref, DerefMut, Index, IndexMut},
 };
 
@@ -184,7 +185,12 @@ impl<Window> WindowNode<Window> {
 	/// Creates a window node of the given `window` and dimensions.
 	#[inline]
 	pub(crate) const fn with_dimensions(window: Window, width: u32, height: u32) -> Self {
-		Self { window, width, height }
+		Self {
+			window,
+			window_changed: false,
+			width,
+			height,
+		}
 	}
 
 	/// Returns a reference to the window node's window.
@@ -193,16 +199,20 @@ impl<Window> WindowNode<Window> {
 		&self.window
 	}
 
-	/// Returns a mutable reference to the window node's window.
-	#[inline(always)]
-	pub fn window_mut(&mut self) -> &mut Window {
-		&mut self.window
+	/// Sets the window node's window to the given `window`.
+	#[inline]
+	pub fn set_window(&mut self, window: Window) {
+		self.window_changed = true;
+
+		self.window = window;
 	}
 
-	/// Sets the window node's window to the given `window`.
-	#[inline(always)]
-	pub fn set_window(&mut self, window: Window) {
-		self.window = window;
+	/// Replaces the window node's window with the given `window`, returning the previous one.
+	#[inline]
+	pub fn replace_window(&mut self, window: Window) -> Window {
+		self.window_changed = true;
+
+		mem::replace(&mut self.window, window)
 	}
 
 	/// Returns the window node's window.

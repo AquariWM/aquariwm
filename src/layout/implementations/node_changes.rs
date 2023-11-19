@@ -467,14 +467,21 @@ impl<Window> GroupNode<Window> {
 	{
 		// If no changes have been made to this group, apply all the child groups' changes and return.
 		if !self.changes_made() {
-			let groups = self.children.iter_mut().filter_map(|node| match node {
-				Node::Group(group) => Some(group),
+			for node in self {
+				match node {
+					Node::Group(group) => group.apply_resizes(resize_window.clone())?,
 
-				Node::Window(_) => None,
-			});
-
-			for group in groups {
-				group.apply_resizes(resize_window.clone())?;
+					Node::Window(WindowNode {
+						window,
+						window_changed,
+						width,
+						height,
+					}) => {
+						if mem::take(window_changed) {
+							resize_window(window, *width, *height)?
+						}
+					},
+				}
 			}
 
 			return Ok(());
@@ -539,7 +546,16 @@ impl<Window> GroupNode<Window> {
 
 			match node {
 				Node::Group(group) => group.apply_resizes(resize_window.clone()),
-				Node::Window(WindowNode { window, .. }) => resize_window(window, primary, secondary),
+
+				Node::Window(WindowNode {
+					window,
+					window_changed,
+					width,
+					height,
+				}) => {
+					*window_changed = false;
+					resize_window(window, *width, *height)
+				},
 			}
 		};
 

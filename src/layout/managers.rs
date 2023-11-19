@@ -143,12 +143,12 @@ where
 			for (i, node) in window_nodes {
 				// If the window matches, remove it and return.
 				if node.window() == window {
-					if stack.len() == 1 {
-						// If it is the last window in the stack, remove the whole stack.
-						self.layout.remove(1);
-					} else {
-						// Otherwise, if it is not the last window in the stack, simply remove that window node.
+					if stack.len() > 1 {
+						// If it is not the last window in the stack, remove the node.
 						stack.remove(i);
+					} else {
+						// Otherwise, if it is the last window in the stack, remove the stack.
+						self.layout.remove(1);
 					}
 
 					return;
