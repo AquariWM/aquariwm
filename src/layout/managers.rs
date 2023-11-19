@@ -66,6 +66,7 @@ where
 		let mut windows = windows.into_iter();
 
 		if let Some(main) = windows.next() {
+			// Push the main window.
 			stack.layout.push_window_back(main);
 
 			// If there are more windows, then add them in a stack.
@@ -90,11 +91,11 @@ where
 	}
 
 	fn add_window(&mut self, window: Window) {
-		if self.layout().is_empty() {
+		if self.layout.is_empty() {
 			// No main, no stack.
 
 			// Add the window as a main.
-			self.layout_mut().push_window_back(window);
+			self.layout.push_window_back(window);
 		} else if let Some(stack) = self.stack_mut() {
 			// Main and stack.
 
@@ -104,7 +105,7 @@ where
 			// Main, no stack.
 
 			// Add the window to a new stack.
-			self.layout_mut()
+			self.layout
 				.push_group_back_with(Orientation::TopToBottom, |stack| stack.push_window_back(window));
 		}
 	}
@@ -132,18 +133,25 @@ where
 		// Otherwise, if the main window does not match...
 
 		// If there is a stack...
-		if let Some(stack) = self.stack() {
-			// For each window in the stack...
-			for i in 0..stack.len() {
-				if let Node::Window(stack_node) = &stack[i] {
-					// If the window matches, remove it and return.
-					if stack_node.window() == window {
-						self.stack_mut()
-							.expect("We've already established the stack is present.")
-							.remove(i);
+		if let Some(stack) = self.stack_mut() {
+			let window_nodes = stack.iter_mut().enumerate().filter_map(|(i, node)| match node {
+				Node::Group(_) => None,
+				Node::Window(window_node) => Some((i, window_node)),
+			});
 
-						return;
+			// For every window node in the stack...
+			for (i, node) in window_nodes {
+				// If the window matches, remove it and return.
+				if node.window() == window {
+					if stack.len() == 1 {
+						// If it is the last window in the stack, remove the whole stack.
+						self.layout.remove(1);
+					} else {
+						// Otherwise, if it is not the last window in the stack, simply remove that window node.
+						stack.remove(i);
 					}
+
+					return;
 				}
 			}
 		}
