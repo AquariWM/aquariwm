@@ -57,12 +57,9 @@ impl WindowState {
 	}
 }
 
-pub struct AquariWm<Window>
-where
-	Window: Eq + Hash + 'static,
-{
+pub struct AquariWm<Window: Eq + Hash + Clone + 'static> {
 	/// The current window layout.
-	pub layout: CurrentLayout<&'static Window>,
+	pub layout: CurrentLayout<Window>,
 
 	/// A [`HashMap`] of windows and their current [`WindowState`s].
 	///
@@ -70,31 +67,28 @@ where
 	pub windows: HashMap<Window, WindowState>,
 }
 
-impl<Window> Default for AquariWm<Window>
-where
-	Window: Eq + Hash,
-{
+impl<Window: Eq + Hash + Clone> Default for AquariWm<Window> {
 	#[inline]
 	fn default() -> Self {
 		Self::new()
 	}
 }
 
-impl<Window> AquariWm<Window>
-where
-	Window: Eq + Hash + 'static,
-{
+impl<Window: Eq + Hash + Clone> AquariWm<Window> {
 	/// Creates a new AquariWM state struct with the default [`CurrentLayout`] and no windows.
 	#[inline]
 	pub fn new() -> Self {
-		Self::with_layout(CurrentLayout::default())
+		Self { ..Default::default() }
 	}
 
 	/// Creates a new AquariWM state struct with the given `layout` and no windows.
 	#[inline]
-	pub fn with_layout(layout: CurrentLayout<&'static Window>) -> Self {
+	pub fn with_tiling_layout<Manager>(width: u32, height: u32) -> Self
+	where
+		Manager: layout::TilingLayoutManager<Window>,
+	{
 		Self {
-			layout,
+			layout: CurrentLayout::new_tiled::<Manager>(width, height),
 			windows: HashMap::new(),
 		}
 	}
@@ -108,7 +102,7 @@ where
 
 	/// Creates a new AquariWM state struct with the given `layout` and `windows`.
 	pub fn with_layout_and_windows(
-		layout: CurrentLayout<&'static Window>,
+		layout: CurrentLayout<Window>,
 		windows: impl IntoIterator<Item = (Window, MapState)>,
 	) -> Self {
 		let mut aquariwm = Self {
@@ -126,7 +120,7 @@ where
 
 		if state.mode == layout::Mode::Tiled && state.mapped == MapState::Mapped {
 			if let CurrentLayout::Tiled(manager) = &mut self.layout {
-				manager.add_window(&window);
+				manager.add_window(window.clone());
 			}
 		}
 
@@ -140,46 +134,73 @@ where
 		}
 	}
 
+	/// Updates AquariWM's state to reflect the given `window` being destroyed.
+	///
+	/// In order to apply any changes that may have been made to the tiling layout,
+	/// [`apply_changes`]
+	#[cfg_attrs(feature = "async", /** or [`apply_changes_async`](Self::apply_changes_async) */)]
+	/// must be called.
+	///
+	/// [`apply_changes`]: Self::apply_changes
 	pub fn remove_window(&mut self, window: &Window) {
 		let state = self.windows.remove(window);
 
+		// Remove the window from the tiling layout if needed.
 		if let Some(state) = state {
 			if state.mode == layout::Mode::Tiled && state.mapped == MapState::Mapped {
 				if let CurrentLayout::Tiled(manager) = &mut self.layout {
-					manager.remove_window(&window);
+					manager.remove_window(window);
 				}
 			}
 		}
 	}
 
-	pub fn map_window(&mut self, window: &'static Window) {
+	/// Updates AquariWM's state to reflect the given `window` being [mapped].
+	///
+	/// In order to apply any changes that may have been made to the tiling layout,
+	/// [`apply_changes`]
+	#[cfg_attrs(feature = "async", /** or [`apply_changes_async`](Self::apply_changes_async) */)]
+	/// must be called.
+	///
+	/// [mapped]: MapState::Mapped
+	/// [`apply_changes`]: Self::apply_changes
+	pub fn map_window(&mut self, window: &Window) {
 		let state = self
 			.windows
 			.get_mut(window)
 			.expect("the window we are attempting to map is not tracked");
 
-		state.set_mapped();
-
 		if state.mode == layout::Mode::Tiled && state.mapped == MapState::Unmapped {
 			if let CurrentLayout::Tiled(manager) = &mut self.layout {
-				manager.add_window(window);
+				manager.add_window(window.clone());
 			}
 		}
+
+		state.set_mapped();
 	}
 
+	/// Updates AquariWM's state to reflect the given `window` being [unmapped].
+	///
+	/// In order to apply any changes that may have been made to the tiling layout,
+	/// [`apply_changes`]
+	#[cfg_attrs(feature = "async", /** or [`apply_changes_async`](Self::apply_changes_async) */)]
+	/// must be called.
+	///
+	/// [unmapped]: MapState::Unmapped
+	/// [`apply_changes`]: Self::apply_changes
 	pub fn unmap_window(&mut self, window: &Window) {
 		let state = self
 			.windows
 			.get_mut(window)
 			.expect("the window we are attempting to unmap is not tracked");
 
-		state.set_unmapped();
-
 		if state.mode == layout::Mode::Tiled && state.mapped == MapState::Mapped {
 			if let CurrentLayout::Tiled(manager) = &mut self.layout {
-				manager.remove_window(&window);
+				manager.remove_window(window);
 			}
 		}
+
+		state.set_unmapped();
 	}
 
 	/// Applies changes made by the [layout manager] by calling [`apply_resizes`] with the given
@@ -198,7 +219,7 @@ where
 	)]
 	pub fn apply_changes<Error>(
 		&mut self,
-		mut resize_window: impl FnMut(&&'static Window, u32, u32) -> Result<(), Error>,
+		mut resize_window: impl FnMut(&Window, u32, u32) -> Result<(), Error>,
 	) -> Result<(), Error> {
 		if let CurrentLayout::Tiled(manager) = &mut self.layout {
 			manager.layout_mut().apply_resizes(&mut resize_window)?;
@@ -220,7 +241,7 @@ where
 	#[cfg(feature = "async")]
 	pub async fn apply_changes_async<ResizeWindowFuture, Error>(
 		&mut self,
-		mut resize_window: impl FnMut(&&'static Window, u32, u32) -> ResizeWindowFuture,
+		mut resize_window: impl FnMut(&Window, u32, u32) -> ResizeWindowFuture,
 	) -> Result<(), Error>
 	where
 		ResizeWindowFuture: Future<Output = Result<(), Error>>,

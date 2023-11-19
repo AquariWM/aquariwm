@@ -17,8 +17,20 @@ impl<Window> CurrentLayout<Window> {
 	/// Creates a new [tiled layout] using the given layout `Manager` type parameter.
 	///
 	/// [tiled layout]: Self::Tiled
+	#[inline(always)]
+	pub(crate) fn new_tiled<Manager>(width: u32, height: u32) -> Self
+	where
+		Manager: TilingLayoutManager<Window>,
+	{
+		Self::tiled_with_windows::<Manager, std::iter::Empty<Window>>(width, height, std::iter::empty())
+	}
+
+	/// Creates a new [tiled layout] using the given layout `Manager` type parameter containing the
+	/// given `windows`.
+	///
+	/// [tiled layout]: Self::Tiled
 	#[inline]
-	pub(crate) fn new_tiled<Manager, Windows>(windows: Windows, width: u32, height: u32) -> Self
+	pub(crate) fn tiled_with_windows<Manager, Windows>(width: u32, height: u32, windows: Windows) -> Self
 	where
 		Manager: TilingLayoutManager<Window>,
 		Windows: IntoIterator<Item = Window>,
@@ -71,22 +83,56 @@ impl<Window> DerefMut for TilingLayout<Window> {
 }
 
 impl<Window> Node<Window> {
-	#[inline]
+	/// Creates a new [`Node::Window`] with a [window node] wrapping the given `window` with
+	/// dimensions of 0 by 0.
+	///
+	/// This is a convenience function for creating a window node with
+	/// <code>Node::Window(WindowNode::[new]\(window))</code>.
+	///
+	/// [window node]: WindowNode
+	/// [new]: WindowNode::new
+	#[inline(always)]
 	pub(crate) const fn new_window(window: Window) -> Self {
 		Self::Window(WindowNode::new(window))
 	}
 
-	#[inline]
+	/// Creates a new [`Node::Window`] with a [window node] wrapping the given `window` with the
+	/// given dimensions.
+	///
+	/// This is a convenience function for creating a window node with
+	/// <code>[Node]::[Window]\([WindowNode]::[with_dimensions]\(window, width, height))</code>.
+	///
+	/// [window node]: WindowNode
+	/// [Window]: Self::Window
+	/// [with_dimensions]: WindowNode::with_dimensions
+	#[inline(always)]
 	pub(crate) const fn window_with_dimensions(window: Window, width: u32, height: u32) -> Self {
 		Self::Window(WindowNode::with_dimensions(window, width, height))
 	}
 
-	#[inline]
+	/// Creates a new [`Node::Group`] with a [group node] of the given `orientation` and dimensions
+	/// of 0 by 0.
+	///
+	/// This is a convenience function for creating a group node with
+	/// <code>[Node]::[Group]\([GroupNode]::[new]\(orientation))</code>.
+	///
+	/// [group node]: GroupNode
+	/// [Group]: Self::Group
+	/// [new]: GroupNode::new
+	#[inline(always)]
 	pub(crate) const fn new_group(orientation: Orientation) -> Self {
 		Self::Group(GroupNode::new(orientation))
 	}
 
-	#[inline]
+	/// Creates a new [`Node::Group`] with a [group node] of the given `orientation` and dimensions.
+	///
+	/// This is a convenience function for creating a group node with
+	/// <code>[Node]::[Group]\([GroupNode]::[with_dimensions]\(orientation, width, height))</code>.
+	///
+	/// [group node]: GroupNode
+	/// [Group]: Self::Group
+	/// [with_dimensions]: GroupNode::with_dimensions
+	#[inline(always)]
 	pub(crate) const fn group_with_dimensions(orientation: Orientation, width: u32, height: u32) -> Self {
 		Self::Group(GroupNode::with_dimensions(orientation, width, height))
 	}
