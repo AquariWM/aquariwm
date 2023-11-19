@@ -82,12 +82,12 @@ impl<Window: Eq + Hash + Clone> AquariWm<Window> {
 
 	/// Creates a new AquariWM state struct with the given `layout` and no windows.
 	#[inline]
-	pub fn with_tiling_layout<Manager>(width: u32, height: u32) -> Self
+	pub fn with_tiling_layout<Manager>(x: i32, y: i32, width: u32, height: u32) -> Self
 	where
 		Manager: layout::TilingLayoutManager<Window>,
 	{
 		Self {
-			layout: CurrentLayout::new_tiled::<Manager>(width, height),
+			layout: CurrentLayout::new_tiled::<Manager>(x, y, width, height),
 			windows: HashMap::new(),
 		}
 	}
@@ -96,16 +96,29 @@ impl<Window: Eq + Hash + Clone> AquariWm<Window> {
 	/// `windows`.
 	#[inline]
 	pub fn with_windows(windows: impl IntoIterator<Item = (Window, MapState)>) -> Self {
-		Self::with_layout_and_windows(CurrentLayout::default(), windows)
+		let mut aquariwm = Self {
+			layout: CurrentLayout::default(),
+			windows: HashMap::new(),
+		};
+
+		aquariwm.add_windows(windows);
+
+		aquariwm
 	}
 
 	/// Creates a new AquariWM state struct with the given `layout` and `windows`.
-	pub fn with_layout_and_windows(
-		layout: CurrentLayout<Window>,
+	pub fn with_tiling_layout_and_windows<Manager>(
+		x: i32,
+		y: i32,
+		width: u32,
+		height: u32,
 		windows: impl IntoIterator<Item = (Window, MapState)>,
-	) -> Self {
+	) -> Self
+	where
+		Manager: layout::TilingLayoutManager<Window>,
+	{
 		let mut aquariwm = Self {
-			layout,
+			layout: CurrentLayout::new_tiled::<Manager>(x, y, width, height),
 			windows: HashMap::new(),
 		};
 
@@ -206,7 +219,7 @@ impl<Window: Eq + Hash + Clone> AquariWm<Window> {
 	/// `resize_window` function.
 	///
 	/// [layout manager]: layout::TilingLayoutManager
-	/// [`apply_resizes`]: layout::GroupNode::apply_resizes
+	/// [`apply_resizes`]: layout::GroupNode::apply_changes
 	#[cfg_attr(
 		feature = "async",
 		doc = "",
@@ -219,10 +232,10 @@ impl<Window: Eq + Hash + Clone> AquariWm<Window> {
 	)]
 	pub fn apply_changes<Error>(
 		&mut self,
-		mut resize_window: impl FnMut(&Window, u32, u32) -> Result<(), Error>,
+		mut reconfigure_window: impl FnMut(&Window, i32, i32, u32, u32) -> Result<(), Error>,
 	) -> Result<(), Error> {
 		if let CurrentLayout::Tiled(manager) = &mut self.layout {
-			manager.layout_mut().apply_resizes(&mut resize_window)?;
+			manager.layout_mut().apply_changes(&mut reconfigure_window)?;
 		}
 
 		Ok(())
@@ -242,7 +255,7 @@ impl<Window: Eq + Hash + Clone> AquariWm<Window> {
 	#[cfg(feature = "async")]
 	pub async fn apply_changes_async<ResizeWindowFuture, Error>(
 		&mut self,
-		mut resize_window: impl FnMut(&Window, u32, u32) -> ResizeWindowFuture,
+		mut reconfigure_window: impl FnMut(&Window, i32, i32, u32, u32) -> ResizeWindowFuture,
 	) -> Result<(), Error>
 	where
 		ResizeWindowFuture: Future<Output = Result<(), Error>>,
@@ -253,8 +266,8 @@ impl<Window: Eq + Hash + Clone> AquariWm<Window> {
 
 			manager
 				.layout_mut()
-				.apply_resizes(&mut |window, width, height| -> Result<(), Error> {
-					futures.push(resize_window(window, width, height));
+				.apply_changes(&mut |window, x, y, width, height| -> Result<(), Error> {
+					futures.push(reconfigure_window(window, x, y, width, height));
 
 					Ok(())
 				})?;

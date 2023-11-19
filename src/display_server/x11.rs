@@ -102,7 +102,7 @@ impl DisplayServer for X11 {
 			let setup = connection.setup();
 			let screen = &setup.roots[screen_num];
 			// Get the root window of the screen.
-			let root = screen.root;
+			let (width, height, root) = (screen.width_in_pixels, screen.height_in_pixels, screen.root);
 
 			// Wrap the connection to provide easy access to utility methods.
 			let wm = Self { conn: connection, root };
@@ -124,7 +124,13 @@ impl DisplayServer for X11 {
 				},
 			}
 
-			let mut state = state::AquariWm::with_windows(wm.query_windows().await?);
+			let mut state = state::AquariWm::with_tiling_layout_and_windows::<layout::managers::Stack<x11::Window>>(
+				0,
+				0,
+				width as u32,
+				height as u32,
+				wm.query_windows().await?,
+			);
 
 			if testing {
 				event!(Level::INFO, "Testing mode enabled");
@@ -139,7 +145,7 @@ impl DisplayServer for X11 {
 			init_span.exit();
 			let event_loop_span = span!(Level::DEBUG, "Event loop");
 
-			let resize_window = |window: &_, width, height| wm.resize_window(*window, width, height);
+			let resize_window = |window: &_, x, y, width, height| wm.reconfigure_window(*window, x, y, width, height);
 
 			loop {
 				let _span = event_loop_span.enter();
@@ -214,10 +220,13 @@ impl X11 {
 	///
 	/// The `resize_window` closure is required because
 	/// [`state::AquariWm::apply_changes_async`] does not expect a [`Self`] parameter.
-	async fn resize_window(&self, window: x11::Window, width: u32, height: u32) -> Result<()> {
+	async fn reconfigure_window(&self, window: x11::Window, x: i32, y: i32, width: u32, height: u32) -> Result<()> {
 		Ok(self
 			.conn
-			.configure_window(window, &x11::ConfigureWindowAux::new().width(width).height(height))
+			.configure_window(
+				window,
+				&x11::ConfigureWindowAux::new().x(x).y(y).width(width).height(height),
+			)
 			.await?
 			.check()
 			.await?)

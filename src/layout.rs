@@ -14,7 +14,7 @@ mod implementations;
 /// Default [layout managers] that come with AquariWM.
 ///
 /// [layout managers]: TilingLayoutManager
-mod managers;
+pub mod managers;
 
 /// Whether a window is [`Tiled`] or [`Floating`].
 ///
@@ -145,11 +145,18 @@ pub struct GroupNode<Window> {
 	/// [`add_window`]: TilingLayoutManager::add_window
 	/// [`remove_window`]: TilingLayoutManager::remove_window
 	new_orientation: Option<Orientation>,
+
 	new_width: Option<u32>,
 	new_height: Option<u32>,
 
+	new_x: Option<i32>,
+	new_y: Option<i32>,
+
 	width: u32,
 	height: u32,
+
+	x: i32,
+	y: i32,
 }
 
 /// Represents a [node] containing a window.
@@ -166,6 +173,9 @@ pub struct WindowNode<Window> {
 
 	width: u32,
 	height: u32,
+
+	x: i32,
+	y: i32,
 }
 
 /// Manages a [tiling layout], restructuring the layout when a window needs to be [added] or
