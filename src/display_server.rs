@@ -4,6 +4,7 @@
 
 use std::{error::Error, future::Future};
 
+use cfg_attrs::cfg_attrs;
 #[cfg(feature = "wayland")]
 pub use wayland::Wayland;
 #[cfg(feature = "x11")]
@@ -39,8 +40,12 @@ pub trait DisplayServer {
 /// [display server]: DisplayServer
 /// [future]: Future
 /// [`run`]: Self::run
-#[cfg_attr(feature = "async", doc = " # See also")]
-#[cfg_attr(feature = "async", doc = " - [AsyncDisplayServer]")]
+#[cfg_attrs(
+	feature = "async",
+	///
+	/// # See also
+	/// - [AsyncDisplayServer]
+)]
 pub trait SyncDisplayServer: DisplayServer<Output = Result<(), Self::Error>> {
 	/// The error type returned from the display server's [`run`] function.
 	///

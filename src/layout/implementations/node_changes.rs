@@ -460,16 +460,15 @@ impl<Window> GroupNode<Window> {
 	///
 	/// [primary]: Node::primary
 	/// [secondary]: Node::secondary
-	fn apply_resizes<Error, ResizeWindowFn>(&mut self, mut resize_window: ResizeWindowFn) -> Result<(), Error>
-	where
-		ResizeWindowFn: FnMut(&Window, u32, u32) -> Result<(), Error>,
-		ResizeWindowFn: Clone,
-	{
+	pub(crate) fn apply_resizes<Error>(
+		&mut self,
+		resize_window: &mut impl FnMut(&Window, u32, u32) -> Result<(), Error>,
+	) -> Result<(), Error> {
 		// If no changes have been made to this group, apply all the child groups' changes and return.
 		if !self.changes_made() {
 			for node in self {
 				match node {
-					Node::Group(group) => group.apply_resizes(resize_window.clone())?,
+					Node::Group(group) => group.apply_resizes(resize_window)?,
 
 					Node::Window(WindowNode {
 						window,
@@ -545,7 +544,7 @@ impl<Window> GroupNode<Window> {
 			node.set_secondary(secondary, new_axis);
 
 			match node {
-				Node::Group(group) => group.apply_resizes(resize_window.clone()),
+				Node::Group(group) => group.apply_resizes(resize_window),
 
 				Node::Window(WindowNode {
 					window,
@@ -615,6 +614,13 @@ impl<Window> GroupNode<Window> {
 mod tests {
 	use super::*;
 
+	/// No-op resize_window function to pass to [`apply_resizes`].
+	///
+	/// [`apply_resizes`]: GroupNode::apply_resizes
+	const fn resize_window<Window>(_window: &Window, _width: u32, _height: u32) -> Result<(), ()> {
+		Ok(())
+	}
+
 	#[test]
 	fn group_orientations() {
 		const INITIAL_ORIENTATION: Orientation = Orientation::LeftToRight;
@@ -634,9 +640,7 @@ mod tests {
 		assert_eq!(group.orientation(), NEW_ORIENTATION);
 
 		// Apply the change in orientation.
-		group
-			.apply_resizes(|_window, _primary, _secondary| -> Result<(), ()> { Ok(()) })
-			.unwrap();
+		group.apply_resizes(&mut resize_window).unwrap();
 
 		assert_eq!(group.orientation, NEW_ORIENTATION);
 		assert_eq!(group.new_orientation, None);
@@ -671,11 +675,6 @@ mod tests {
 	/// [`orientation`]: GroupNode::orientation()
 	#[test]
 	fn resizing() {
-		// No-op resize_window function to pass to `apply_changes`.
-		const fn resize_window(_window: &u32, _primary: u32, _secondary: u32) -> Result<(), ()> {
-			Ok(())
-		}
-
 		const GROUP_WIDTH: u32 = 3000;
 		const GROUP_HEIGHT: u32 = 1000;
 
@@ -706,7 +705,7 @@ mod tests {
 		);
 
 		// Resize the added window.
-		group.apply_resizes(resize_window).unwrap();
+		group.apply_resizes(&mut resize_window).unwrap();
 
 		assert!(
 			matches!(
@@ -724,7 +723,7 @@ mod tests {
 		group.push_windows_back([2, 3]);
 
 		// Resize the existing window and two added windows.
-		group.apply_resizes(resize_window).unwrap();
+		group.apply_resizes(&mut resize_window).unwrap();
 
 		for node in &group {
 			assert!(
@@ -745,7 +744,7 @@ mod tests {
 		group.remove(0);
 
 		// Resize the two remaining windows.
-		group.apply_resizes(resize_window).unwrap();
+		group.apply_resizes(&mut resize_window).unwrap();
 
 		for node in &group {
 			assert!(
@@ -768,13 +767,13 @@ mod tests {
 		clone.push_window_front(1);
 		clone.remove(0);
 		// Apply the changes (of which there should be none).
-		clone.apply_resizes(resize_window).unwrap();
+		clone.apply_resizes(&mut resize_window).unwrap();
 
 		assert_eq!(group, clone);
 
 		group.set_orientation(Orientation::TopToBottom);
 		// Apply the orientation change.
-		group.apply_resizes(resize_window).unwrap();
+		group.apply_resizes(&mut resize_window).unwrap();
 
 		for node in &group {
 			assert!(

@@ -4,6 +4,10 @@
 
 use std::{collections::HashMap, hash::Hash};
 
+use cfg_attrs::cfg_attrs;
+#[cfg(feature = "async")]
+use {futures::future, std::future::Future};
+
 use crate::layout::{self, CurrentLayout};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
@@ -55,10 +59,10 @@ impl WindowState {
 
 pub struct AquariWm<Window>
 where
-	Window: Eq + Hash,
+	Window: Eq + Hash + 'static,
 {
 	/// The current window layout.
-	pub layout: CurrentLayout<Window>,
+	pub layout: CurrentLayout<&'static Window>,
 
 	/// A [`HashMap`] of windows and their current [`WindowState`s].
 	///
@@ -66,9 +70,9 @@ where
 	pub windows: HashMap<Window, WindowState>,
 }
 
-impl<Ordinary> Default for AquariWm<Ordinary>
+impl<Window> Default for AquariWm<Window>
 where
-	Ordinary: Eq + Hash,
+	Window: Eq + Hash,
 {
 	#[inline]
 	fn default() -> Self {
@@ -78,7 +82,7 @@ where
 
 impl<Window> AquariWm<Window>
 where
-	Window: Eq + Hash,
+	Window: Eq + Hash + 'static,
 {
 	/// Creates a new AquariWM state struct with the default [`CurrentLayout`] and no windows.
 	#[inline]
@@ -88,7 +92,7 @@ where
 
 	/// Creates a new AquariWM state struct with the given `layout` and no windows.
 	#[inline]
-	pub fn with_layout(layout: CurrentLayout<Window>) -> Self {
+	pub fn with_layout(layout: CurrentLayout<&'static Window>) -> Self {
 		Self {
 			layout,
 			windows: HashMap::new(),
@@ -104,7 +108,7 @@ where
 
 	/// Creates a new AquariWM state struct with the given `layout` and `windows`.
 	pub fn with_layout_and_windows(
-		layout: CurrentLayout<Window>,
+		layout: CurrentLayout<&'static Window>,
 		windows: impl IntoIterator<Item = (Window, MapState)>,
 	) -> Self {
 		let mut aquariwm = Self {
@@ -117,41 +121,126 @@ where
 		aquariwm
 	}
 
-	#[inline]
 	pub fn add_window(&mut self, window: Window, mapped: MapState) {
-		self.insert_window(window, mapped);
+		let state = WindowState::new(mapped);
+
+		if state.mode == layout::Mode::Tiled && state.mapped == MapState::Mapped {
+			if let CurrentLayout::Tiled(manager) = &mut self.layout {
+				manager.add_window(&window);
+			}
+		}
+
+		self.windows.insert(window, state);
 	}
 
 	#[inline]
 	pub fn add_windows(&mut self, windows: impl IntoIterator<Item = (Window, MapState)>) {
 		for (window, mapped) in windows {
-			self.insert_window(window, mapped);
+			self.add_window(window, mapped);
 		}
 	}
 
-	#[inline]
-	fn insert_window(&mut self, window: Window, mapped: MapState) {
-		self.windows.insert(window, WindowState::new(mapped));
-	}
-
-	#[inline]
 	pub fn remove_window(&mut self, window: &Window) {
-		self.windows.remove(window);
+		let state = self.windows.remove(window);
+
+		if let Some(state) = state {
+			if state.mode == layout::Mode::Tiled && state.mapped == MapState::Mapped {
+				if let CurrentLayout::Tiled(manager) = &mut self.layout {
+					manager.remove_window(&window);
+				}
+			}
+		}
 	}
 
-	#[inline]
-	pub fn map_window(&mut self, window: &Window) {
-		self.windows
+	pub fn map_window(&mut self, window: &'static Window) {
+		let state = self
+			.windows
 			.get_mut(window)
-			.expect("the window we are attempting to map is not tracked")
-			.set_mapped();
+			.expect("the window we are attempting to map is not tracked");
+
+		state.set_mapped();
+
+		if state.mode == layout::Mode::Tiled && state.mapped == MapState::Unmapped {
+			if let CurrentLayout::Tiled(manager) = &mut self.layout {
+				manager.add_window(window);
+			}
+		}
 	}
 
-	#[inline]
 	pub fn unmap_window(&mut self, window: &Window) {
-		self.windows
+		let state = self
+			.windows
 			.get_mut(window)
-			.expect("the window we are attempting to unmap is not tracked")
-			.set_unmapped();
+			.expect("the window we are attempting to unmap is not tracked");
+
+		state.set_unmapped();
+
+		if state.mode == layout::Mode::Tiled && state.mapped == MapState::Mapped {
+			if let CurrentLayout::Tiled(manager) = &mut self.layout {
+				manager.remove_window(&window);
+			}
+		}
+	}
+
+	/// Applies changes made by the [layout manager] by calling [`apply_resizes`] with the given
+	/// `resize_window` function.
+	///
+	/// [layout manager]: layout::TilingLayoutManager
+	/// [`apply_resizes`]: layout::GroupNode::apply_resizes
+	#[cfg_attrs(
+	feature = "async",
+	///
+	/// # See also
+	/// [`apply_changes_async`] allows using a `resize_window` function that returns a [future].
+	///
+	/// [`apply_changes_async`]: Self::apply_changes_async
+	/// [future]: Future
+	)]
+	pub fn apply_changes<Error>(
+		&mut self,
+		mut resize_window: impl FnMut(&&'static Window, u32, u32) -> Result<(), Error>,
+	) -> Result<(), Error> {
+		if let CurrentLayout::Tiled(manager) = &mut self.layout {
+			manager.layout_mut().apply_resizes(&mut resize_window)?;
+		}
+
+		Ok(())
+	}
+
+	/// Applies changes made by the [layout manager] by calling `apply_changes` with the given
+	/// `resize_window` function.
+	///
+	/// # See also
+	/// [`apply_changes`] allows using a `resize_window` function that doesn't return a [future].
+	///
+	/// [layout manager]: layout::TilingLayoutManager
+	/// [future]: Future
+	///
+	/// [`apply_changes`]: Self::apply_changes
+	#[cfg(feature = "async")]
+	pub async fn apply_changes_async<ResizeWindowFuture, Error>(
+		&mut self,
+		mut resize_window: impl FnMut(&&'static Window, u32, u32) -> ResizeWindowFuture,
+	) -> Result<(), Error>
+	where
+		ResizeWindowFuture: Future<Output = Result<(), Error>>,
+	{
+		if let CurrentLayout::Tiled(manager) = &mut self.layout {
+			// Add all the `resize_window` futures to this list...
+			let mut futures = Vec::new();
+
+			manager
+				.layout_mut()
+				.apply_resizes(&mut |window, width, height| -> Result<(), Error> {
+					futures.push(resize_window(window, width, height));
+
+					Ok(())
+				})?;
+
+			// Await all the `resize_window` futures.
+			future::try_join_all(futures).await?;
+		}
+
+		Ok(())
 	}
 }
