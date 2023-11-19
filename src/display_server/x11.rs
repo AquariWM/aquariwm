@@ -4,7 +4,7 @@
 
 use std::{env, fmt::Debug, future::Future, io, thread};
 
-use futures::future;
+use futures::{future, try_join};
 use thiserror::Error;
 use tracing::{event, span, Level};
 use x11rb_async::{
@@ -139,6 +139,8 @@ impl DisplayServer for X11 {
 			init_span.exit();
 			let event_loop_span = span!(Level::DEBUG, "Event loop");
 
+			let resize_window = |window: &_, width, height| wm.resize_window(*window, width, height);
+
 			loop {
 				let _span = event_loop_span.enter();
 
@@ -153,16 +155,34 @@ impl DisplayServer for X11 {
 					// Track the state of newly created windows.
 					Event::CreateNotify(CreateNotify { window, .. }) => {
 						state.add_window(window, state::MapState::Unmapped);
+
+						state.apply_changes_async(resize_window).await?;
 					},
 					// Stop tracking the state of destroyed windows.
 					Event::DestroyNotify(DestroyNotify { window, .. }) => {
 						state.remove_window(&window);
+
+						state.apply_changes_async(resize_window).await?;
 					},
 
 					// If a client requests to map its window, map it.
 					Event::MapRequest(MapRequest { window, .. }) => {
-						wm.conn.map_window(window);
 						state.map_window(&window);
+
+						try_join!(
+							async {
+								wm.conn.map_window(window).await?.check().await?;
+
+								Ok(())
+							},
+							state.apply_changes_async(resize_window)
+						)?;
+					},
+					// If a client's window is unmapped, update state accordingly.
+					Event::UnmapNotify(UnmapNotify { window, .. }) => {
+						state.unmap_window(&window);
+
+						state.apply_changes_async(resize_window).await?;
 					},
 
 					// If a client requests to configure its window, honor it. For a tiling layout, this
@@ -177,9 +197,6 @@ impl DisplayServer for X11 {
 					Event::CirculateRequest(request) => {
 						wm.circulate_window(&state, request.window, request.place).await?;
 					},
-					Event::UnmapNotify(UnmapNotify { window, .. }) => {
-						state.unmap_window(&window);
-					},
 
 					_ => (),
 				}
@@ -189,6 +206,23 @@ impl DisplayServer for X11 {
 }
 
 impl X11 {
+	/// Resizes the given `window` to the given dimensions.
+	///
+	/// This is required because if the `resize_window` closure were to use an `async`
+	/// block, it would have to be `async move` in order to move `width` and `height`, which
+	/// would also move the `conn` (which we don't want to do).
+	///
+	/// The `resize_window` closure is required because
+	/// [`state::AquariWm::apply_changes_async`] does not expect a [`Self`] parameter.
+	async fn resize_window(&self, window: x11::Window, width: u32, height: u32) -> Result<()> {
+		Ok(self
+			.conn
+			.configure_window(window, &x11::ConfigureWindowAux::new().width(width).height(height))
+			.await?
+			.check()
+			.await?)
+	}
+
 	/// Circulates the given [floating] `window` in the given `direction`.
 	///
 	/// # Errors
@@ -223,6 +257,9 @@ impl X11 {
 				self.conn
 					.circulate_window(direction.into(), window)
 					.await
+					.map_err(Error::from)?
+					.check()
+					.await
 					.map_err(Error::from)?;
 
 				// If we're moving the window to the bottom, then we have to move all the tiling windows
@@ -238,9 +275,12 @@ impl X11 {
 						});
 
 					// Move each tiled window to the bottom of the window stack.
-					future::try_join_all(tiled_windows.map(|&window| {
+					future::try_join_all(tiled_windows.map(|&window| async move {
 						self.conn
 							.circulate_window(CirculateDirection::MoveToBottom.into(), window)
+							.await?
+							.check()
+							.await
 					}))
 					.await
 					.map_err(Error::from)?;
