@@ -22,7 +22,7 @@ jobs:
             # about to do the exact same tests and documentation on potentially new
             # code, so it is pointless to continue them.
             -   name: Cancel existing workflow runs
-                uses: styfle/cancel-workflow-action@0.11.0
+                uses: styfle/cancel-workflow-action@0.12.0
                 with:
                     access_token: ${{ github.token }}
 
