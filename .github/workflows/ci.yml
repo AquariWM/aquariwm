@@ -39,7 +39,7 @@ jobs:
         steps:
             # Check out (a.k.a. clones) the AquariWM repository.
             -   name: Checkout AquariWM
-                uses: actions/checkout@v3
+                uses: actions/checkout@v4
 
             # Install `libsystemd-dev`, `libudev-dev`, `libseat-dev`, `libinput-dev`, and
             # `libxkbcommon-dev` to satisfy dependencies.
@@ -109,7 +109,7 @@ jobs:
         steps:
             # Check out (a.k.a. clones) the AquariWM repository.
             -   name: Checkout AquariWM
-                uses: actions/checkout@v3
+                uses: actions/checkout@v4
                 with:
                     ref: ${{ needs.fix-n-format.outputs.commit-id }}
 
@@ -151,7 +151,7 @@ jobs:
             # Check out (a.k.a. clones) the AquariWM repository with fixes made by `clippy`
             # in `clippy-fixes`, if any.
             -   name: Checkout AquariWM
-                uses: actions/checkout@v3
+                uses: actions/checkout@v4
                 with:
                     ref: ${{ needs.fix-n-format.outputs.commit-id }}
 
@@ -195,7 +195,7 @@ jobs:
             # Check out (a.k.a. clones) the AquariWM repository with fixes made by `clippy` in
             # `clippy-fixes`, if any, and formatting made by `rustfmt` in `auto-format`, if any.
             -   name: Checkout AquariWM
-                uses: actions/checkout@v3
+                uses: actions/checkout@v4
                 with:
                     ref: ${{ needs.fix-n-format.outputs.commit-id }}
                     path: aquariwm
@@ -209,7 +209,7 @@ jobs:
 
             # Check out a template to put the generated docs in.
             -   name: Checkout AquariWM docs template
-                uses: actions/checkout@v3
+                uses: actions/checkout@v4
                 with:
                     repository: AquariWM/aquariwm-docs-template
                     path: template
