@@ -228,7 +228,7 @@ jobs:
 
             # Setup GitHub Pages to easily deploy to it.
             -   name: Setup GitHub Pages
-                uses: actions/configure-pages@v2
+                uses: actions/configure-pages@v3
 
             # Build documentation with `rustdoc`.
             -   name: Build documentation
