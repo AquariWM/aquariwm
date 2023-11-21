@@ -89,6 +89,64 @@ impl<Window> DerefMut for TilingLayout<Window> {
 }
 
 impl<Window> Node<Window> {
+	#[inline(always)]
+	pub const fn is_window(&self) -> bool {
+		matches!(self, Self::Window(_))
+	}
+
+	#[inline(always)]
+	pub const fn is_group(&self) -> bool {
+		matches!(self, Self::Group(_))
+	}
+
+	#[inline]
+	pub fn unwrap_window(self) -> WindowNode<Window> {
+		match self {
+			Self::Window(window) => window,
+			_ => panic!("expected a window node"),
+		}
+	}
+
+	#[inline]
+	pub fn unwrap_window_ref(&self) -> &WindowNode<Window> {
+		match self {
+			Self::Window(window) => window,
+			_ => panic!("expected a window node"),
+		}
+	}
+
+	#[inline]
+	pub fn unwrap_window_mut(&mut self) -> &mut WindowNode<Window> {
+		match self {
+			Self::Window(window) => window,
+			_ => panic!("expected a window node"),
+		}
+	}
+
+	#[inline]
+	pub fn unwrap_group(self) -> GroupNode<Window> {
+		match self {
+			Self::Group(group) => group,
+			_ => panic!("expected a group node"),
+		}
+	}
+
+	#[inline]
+	pub fn unwrap_group_ref(&self) -> &GroupNode<Window> {
+		match self {
+			Self::Group(group) => group,
+			_ => panic!("expected a group node"),
+		}
+	}
+
+	#[inline]
+	pub fn unwrap_group_mut(&mut self) -> &mut GroupNode<Window> {
+		match self {
+			Self::Group(group) => group,
+			_ => panic!("expected a group node"),
+		}
+	}
+
 	/// Creates a new [`Node::Window`] with a [window node] wrapping the given `window`.
 	///
 	/// This is a convenience function for creating a window node with

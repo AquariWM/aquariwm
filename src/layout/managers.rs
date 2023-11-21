@@ -155,3 +155,141 @@ where
 		}
 	}
 }
+
+pub struct Spiral<Window: Send + Sync + PartialEq + 'static> {
+	layout: TilingLayout<Window>,
+}
+
+unsafe impl<Window> TilingLayoutManager<Window> for Spiral<Window>
+where
+	Window: Send + Sync + PartialEq + 'static,
+{
+	#[inline(always)]
+	fn orientation() -> Orientation
+	where
+		Self: Sized,
+	{
+		Orientation::LeftToRight
+	}
+
+	fn init<WindowsIter>(layout: TilingLayout<Window>, windows: WindowsIter) -> Self
+	where
+		Self: Sized,
+		WindowsIter: IntoIterator<Item = Window>,
+		WindowsIter::IntoIter: ExactSizeIterator,
+	{
+		let mut spiral = Self { layout };
+
+		let mut target_group: Option<&mut GroupNode<_>> = Some(&mut spiral.layout);
+
+		for window in windows {
+			match target_group.take() {
+				Some(target) => {
+					target.push_group_back(target.orientation.rotated_by(1));
+
+					if let Node::Group(group) = &mut target[1] {
+						group.push_window_front(window);
+						target_group = Some(group);
+					}
+				},
+
+				// TODO: see if there is a way to avoid using `Option` here (its usage avoids
+				//     : multiple mutable borrows issues)
+				None => unreachable!(),
+			}
+		}
+
+		spiral
+	}
+
+	#[inline(always)]
+	fn layout(&self) -> &TilingLayout<Window> {
+		&self.layout
+	}
+
+	#[inline(always)]
+	fn layout_mut(&mut self) -> &mut TilingLayout<Window> {
+		&mut self.layout
+	}
+
+	fn add_window(&mut self, window: Window) {
+		let group = {
+			// TODO: avoid using `Option` if possible (only used to avoid issues with multiple
+			//     : mutable borrows, which using `take()` solves)
+			let mut target_group: Option<&mut GroupNode<_>> = Some(&mut self.layout);
+
+			while let Some(Node::Group(group)) = target_group.take().unwrap().get_mut(1) {
+				target_group = Some(group);
+			}
+
+			target_group.unwrap()
+		};
+
+		group.push_group_back_with(group.orientation(), |group| {
+			group.push_window_front(window);
+		});
+	}
+
+	fn remove_window(&mut self, window: &Window) {
+		// If the first window matches, remove it and return.
+		if let Some(Node::Window(window_node)) = self.layout.get(0) {
+			if window_node.window() == window {
+				if self.layout.get(1).is_some() {
+					// If there are more groups, move the windows up to replace the first window.
+
+					Self::move_window_up(&mut self.layout);
+				} else {
+					// Otherwise, remove the first window node.
+
+					self.layout.pop_front();
+				}
+
+				return;
+			}
+		}
+
+		let mut target_group: Option<&mut GroupNode<_>> = Some(&mut self.layout);
+
+		while let Some(target) = target_group.take() {
+			if let Some(Node::Group(group)) = target.get_mut(1) {
+				if group[0].unwrap_window_ref().window() == window {
+					// Window matches.
+
+					match group.get_mut(1) {
+						// Has a child group: shift all the windows up to replace the removed one.
+						Some(Node::Group(group)) => {
+							Self::move_window_up(group);
+						},
+
+						// Doesn't have a child group: remove the node.
+						_ => {
+							// FIXME: Why doesn't this work?! It's fine if you remove the `else`
+							//      : branch below, but it is so obviously not accessible because
+							//      : this if branch ends in `return`. The compiler should
+							//      : absolutely be able to work that out.
+							// target.remove(1);
+						},
+					}
+
+					return;
+				} else {
+					// Window doesn't match; move onto the next group.
+
+					target_group = Some(group);
+				}
+			}
+		}
+	}
+}
+
+impl<Window: Send + Sync + PartialEq + 'static> Spiral<Window> {
+	fn move_window_up(group: &mut GroupNode<Window>) -> Window {
+		let window = if let Some(Node::Group(group)) = group[1].unwrap_group_mut().get_mut(1) {
+			Self::move_window_up(group)
+		} else {
+			group.remove(1).unwrap().unwrap_window().into_window()
+		};
+
+		group[0].unwrap_window_mut().replace_window(window)
+	}
+}
