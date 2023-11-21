@@ -292,7 +292,7 @@ delegate_shm!(WaylandState);
 // }}}
 
 impl WaylandState {
-	pub fn new(display: Display<Self>, event_loop: &mut EventLoop<Self>) -> Self {
+	pub fn new(display: Display<Self>, event_loop: &mut EventLoop<Self>, settings: LayoutSettings) -> Self {
 		let start_time = time::Instant::now();
 		let display_handle = display.handle();
 
@@ -319,7 +319,7 @@ impl WaylandState {
 			space: Space::default(),
 			loop_signal: event_loop.get_signal(),
 
-			aquariwm_state: crate::state::AquariWm::new(LayoutSettings::default()),
+			aquariwm_state: crate::state::AquariWm::new(settings),
 
 			// A whole bunch of Smithay-related state.
 			compositor_state: CompositorState::new::<Self>(&display_handle),

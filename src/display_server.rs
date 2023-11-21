@@ -9,6 +9,8 @@ pub use wayland::Wayland;
 #[cfg(feature = "x11")]
 pub use x11::X11;
 
+use crate::layout::LayoutSettings;
+
 #[cfg(feature = "wayland")]
 pub mod wayland;
 #[cfg(feature = "x11")]
@@ -24,7 +26,7 @@ pub trait DisplayServer {
 	const NAME: &'static str;
 
 	/// Runs the AquariWM implementation for this display server.
-	fn run(testing: bool) -> Self::Output;
+	fn run(testing: bool, settings: LayoutSettings) -> Self::Output;
 
 	/// Returns AquariWM's title, formatted with the display server [`NAME`].
 	///

@@ -31,7 +31,7 @@ pub struct LayoutSettings {
 	///
 	/// [nodes]: Node
 	/// [tiling layout]: TilingLayout
-	#[default = 10]
+	#[default = 15]
 	pub window_gap: u32,
 }
 

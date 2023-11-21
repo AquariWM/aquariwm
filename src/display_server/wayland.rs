@@ -24,7 +24,10 @@ use smithay::{
 use thiserror::Error;
 use tracing::{event, span, Level};
 
-use crate::display_server::{DisplayServer, SyncDisplayServer};
+use crate::{
+	display_server::{DisplayServer, SyncDisplayServer},
+	layout::LayoutSettings,
+};
 
 pub mod grabs;
 mod input;
@@ -62,14 +65,14 @@ impl DisplayServer for Wayland {
 	type Output = Result<(), Error>;
 	const NAME: &'static str = "Wayland";
 
-	fn run(testing: bool) -> Result<(), Error> {
+	fn run(testing: bool, settings: LayoutSettings) -> Result<(), Error> {
 		// Log initialisation.
 		let init_span = span!(Level::INFO, "Initialising").entered();
 
 		// Create an event loop for the compositor to run with.
 		let mut event_loop = <EventLoop<state::WaylandState>>::try_new()?;
 		// Initialise the AquariWM state.
-		let mut state = state::WaylandState::new(Display::new()?, &mut event_loop);
+		let mut state = state::WaylandState::new(Display::new()?, &mut event_loop, settings);
 
 		// Init winit for testing if the testing feature is enabled.
 		#[cfg(feature = "testing")]

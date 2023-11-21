@@ -16,6 +16,10 @@ pub struct Cli {
 	#[arg(long = "no-testing", alias = "no-test", overrides_with = "testing")]
 	pub no_testing: bool,
 
+	#[arg(long = "window-gap", alias = "gap")]
+	/// The gap between windows in a tiling layout.
+	pub window_gap: Option<u32>,
+
 	#[command(subcommand)]
 	pub subcommand: Subcommand,
 }

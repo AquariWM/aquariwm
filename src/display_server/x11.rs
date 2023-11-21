@@ -83,7 +83,7 @@ impl DisplayServer for X11 {
 	type Output = impl Future<Output = Result<(), Error>>;
 	const NAME: &'static str = "X11";
 
-	fn run(testing: bool) -> Self::Output {
+	fn run(testing: bool, settings: LayoutSettings) -> Self::Output {
 		async move {
 			let init_span = span!(Level::INFO, "Initialisation").entered();
 
@@ -167,7 +167,7 @@ impl DisplayServer for X11 {
 				width as u32,
 				height as u32,
 				wm.query_windows().await?,
-				LayoutSettings::default(),
+				settings,
 			);
 
 			if testing {

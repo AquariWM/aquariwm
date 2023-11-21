@@ -13,7 +13,7 @@ use std::{env, ffi::OsString, io, process};
 use clap::Parser;
 use thiserror::Error;
 
-use crate::display_server::DisplayServer;
+use crate::{display_server::DisplayServer, layout::LayoutSettings};
 
 mod cli;
 pub mod display_server;
@@ -49,16 +49,21 @@ fn main() -> Result<()> {
 	// Whether testing is enabled.
 	let testing = args.testing();
 
+	let settings = match args.window_gap {
+		Some(window_gap) => LayoutSettings::new().window_gap(window_gap),
+		None => LayoutSettings::default(),
+	};
+
 	match &args.subcommand {
 		#[cfg(feature = "wayland")]
-		cli::Subcommand::Wayland => Ok(display_server::Wayland::run(testing)?),
+		cli::Subcommand::Wayland => Ok(display_server::Wayland::run(testing, settings)?),
 
 		#[cfg(feature = "x11")]
 		cli::Subcommand::X11 => Ok(tokio::runtime::Builder::new_multi_thread()
 			.enable_all()
 			.build()
 			.unwrap()
-			.block_on(async { display_server::X11::run(testing).await })?),
+			.block_on(async { display_server::X11::run(testing, settings).await })?),
 	}
 }
 
