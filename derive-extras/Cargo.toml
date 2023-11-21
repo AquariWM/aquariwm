@@ -3,6 +3,7 @@ name = "derive-extras"
 authors = ["Antikyth"]
 version = "0.1.0"
 license = "MPL-2.0"
+description = "Adds a number of useful extra `#[derive(...)]` macros."
 edition = "2021"
 
 [lib]
