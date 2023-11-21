@@ -17,7 +17,10 @@ use x11rb_async::{
 			ConnectionExt,
 			CreateNotifyEvent as CreateNotify,
 			DestroyNotifyEvent as DestroyNotify,
+			EnterNotifyEvent as EnterNotify,
 			EventMask,
+			InputFocus,
+			KeyPressEvent as KeyPress,
 			MapRequestEvent as MapRequest,
 			UnmapNotifyEvent as UnmapNotify,
 		},
@@ -29,6 +32,7 @@ use x11rb_async::{
 use crate::{
 	display_server::{AsyncDisplayServer, DisplayServer},
 	layout,
+	layout::LayoutSettings,
 	state,
 };
 
@@ -124,12 +128,46 @@ impl DisplayServer for X11 {
 				},
 			}
 
+			const ENTER: u8 = 0x0d;
+			let exit_window_grab = async {
+				wm.conn
+					.grab_key(
+						false,
+						root,
+						x11::ModMask::M4 | x11::ModMask::SHIFT,
+						b'I',
+						x11::GrabMode::ASYNC,
+						x11::GrabMode::ASYNC,
+					)
+					.await?
+					.ignore_error();
+
+				<Result<_, Error>>::Ok(())
+			};
+			let spawn_terminal_grab = async {
+				wm.conn
+					.grab_key(
+						false,
+						root,
+						x11::ModMask::M4 | x11::ModMask::SHIFT,
+						ENTER,
+						x11::GrabMode::ASYNC,
+						x11::GrabMode::ASYNC,
+					)
+					.await?
+					.ignore_error();
+
+				Ok(())
+			};
+			try_join!(exit_window_grab, spawn_terminal_grab)?;
+
 			let mut state = state::AquariWm::with_tiling_layout_and_windows::<layout::managers::Stack<x11::Window>>(
 				0,
 				0,
 				width as u32,
 				height as u32,
 				wm.query_windows().await?,
+				LayoutSettings::default(),
 			);
 
 			if testing {
@@ -202,6 +240,46 @@ impl DisplayServer for X11 {
 					// of the stack.
 					Event::CirculateRequest(request) => {
 						wm.circulate_window(&state, request.window, request.place).await?;
+					},
+
+					// Focus a window when the cursor enters it.
+					// TODO: move floating windows above (avoid flickering bug).
+					// TODO: implement focus behavior setting
+					Event::EnterNotify(EnterNotify { event, .. }) => {
+						const CURRENT_TIME: u32 = 0;
+
+						wm.conn
+							.set_input_focus(InputFocus::PARENT, event, CURRENT_TIME)
+							.await?
+							.ignore_error();
+					},
+
+					Event::KeyPress(KeyPress {
+						event, state, detail, ..
+					}) => {
+						event!(
+							Level::INFO,
+							"Key pressed, {event}, {state:?}, {detail}",
+							event = event,
+							state = state,
+							detail = detail,
+						);
+
+						if state == x11::KeyButMask::MOD4 | x11::KeyButMask::SHIFT {
+							match detail {
+								ENTER => {
+									if let Err(error) = crate::launch_terminal() {
+										event!(Level::WARN, "Failed to launch terminal: {error}");
+									}
+								},
+
+								b'I' => {
+									wm.conn.destroy_window(event).await?.ignore_error();
+								},
+
+								_ => (),
+							}
+						}
 					},
 
 					_ => (),

@@ -7,7 +7,7 @@ use std::{collections::HashMap, hash::Hash};
 #[cfg(feature = "async")]
 use {futures::future, std::future::Future};
 
-use crate::layout::{self, CurrentLayout};
+use crate::layout::{self, CurrentLayout, LayoutSettings};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum MapState {
@@ -59,6 +59,7 @@ impl WindowState {
 pub struct AquariWm<Window: Eq + Hash + Clone + 'static> {
 	/// The current window layout.
 	pub layout: CurrentLayout<Window>,
+	pub settings: LayoutSettings,
 
 	/// A [`HashMap`] of windows and their current [`WindowState`s].
 	///
@@ -69,35 +70,46 @@ pub struct AquariWm<Window: Eq + Hash + Clone + 'static> {
 impl<Window: Eq + Hash + Clone> Default for AquariWm<Window> {
 	#[inline]
 	fn default() -> Self {
-		Self::new()
+		Self {
+			layout: Default::default(),
+			settings: Default::default(),
+			windows: Default::default(),
+		}
 	}
 }
 
 impl<Window: Eq + Hash + Clone> AquariWm<Window> {
 	/// Creates a new AquariWM state struct with the default [`CurrentLayout`] and no windows.
 	#[inline]
-	pub fn new() -> Self {
-		Self { ..Default::default() }
+	pub fn new(settings: LayoutSettings) -> Self {
+		Self {
+			settings,
+
+			..Default::default()
+		}
 	}
 
 	/// Creates a new AquariWM state struct with the given `layout` and no windows.
 	#[inline]
-	pub fn with_tiling_layout<Manager>(x: i32, y: i32, width: u32, height: u32) -> Self
+	pub fn with_tiling_layout<Manager>(x: i32, y: i32, width: u32, height: u32, settings: LayoutSettings) -> Self
 	where
 		Manager: layout::TilingLayoutManager<Window>,
 	{
 		Self {
 			layout: CurrentLayout::new_tiled::<Manager>(x, y, width, height),
+			settings,
+
 			windows: HashMap::new(),
 		}
 	}
 
 	/// Creates a new AquariWM state struct with the default [`CurrentLayout`] and the given
 	/// `windows`.
-	#[inline]
-	pub fn with_windows(windows: impl IntoIterator<Item = (Window, MapState)>) -> Self {
+	pub fn with_windows(windows: impl IntoIterator<Item = (Window, MapState)>, settings: LayoutSettings) -> Self {
 		let mut aquariwm = Self {
 			layout: CurrentLayout::default(),
+			settings,
+
 			windows: HashMap::new(),
 		};
 
@@ -113,12 +125,15 @@ impl<Window: Eq + Hash + Clone> AquariWm<Window> {
 		width: u32,
 		height: u32,
 		windows: impl IntoIterator<Item = (Window, MapState)>,
+		settings: LayoutSettings,
 	) -> Self
 	where
 		Manager: layout::TilingLayoutManager<Window>,
 	{
 		let mut aquariwm = Self {
 			layout: CurrentLayout::new_tiled::<Manager>(x, y, width, height),
+			settings,
+
 			windows: HashMap::new(),
 		};
 
@@ -235,7 +250,9 @@ impl<Window: Eq + Hash + Clone> AquariWm<Window> {
 		mut reconfigure_window: impl FnMut(&Window, i32, i32, u32, u32) -> Result<(), Error>,
 	) -> Result<(), Error> {
 		if let CurrentLayout::Tiled(manager) = &mut self.layout {
-			manager.layout_mut().apply_changes(&mut reconfigure_window)?;
+			manager
+				.layout_mut()
+				.apply_changes(&mut reconfigure_window, &self.settings)?;
 		}
 
 		Ok(())
@@ -264,13 +281,14 @@ impl<Window: Eq + Hash + Clone> AquariWm<Window> {
 			// Add all the `resize_window` futures to this list...
 			let mut futures = Vec::new();
 
-			manager
-				.layout_mut()
-				.apply_changes(&mut |window, x, y, width, height| -> Result<(), Error> {
+			manager.layout_mut().apply_changes(
+				&mut |window, x, y, width, height| -> Result<(), Error> {
 					futures.push(reconfigure_window(window, x, y, width, height));
 
 					Ok(())
-				})?;
+				},
+				&self.settings,
+			)?;
 
 			// Await all the `resize_window` futures.
 			future::try_join_all(futures).await?;

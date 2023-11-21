@@ -49,7 +49,7 @@ use smithay::{
 };
 
 use super::grabs::{move_grab::MoveSurfaceGrab, resize_grab::ResizeSurfaceGrab};
-use crate::state::MapState;
+use crate::{layout::LayoutSettings, state::MapState};
 
 type Point<N = i32, Space = LogicalSpace> = smithay::utils::Point<N, Space>;
 
@@ -319,7 +319,7 @@ impl WaylandState {
 			space: Space::default(),
 			loop_signal: event_loop.get_signal(),
 
-			aquariwm_state: crate::state::AquariWm::new(),
+			aquariwm_state: crate::state::AquariWm::new(LayoutSettings::default()),
 
 			// A whole bunch of Smithay-related state.
 			compositor_state: CompositorState::new::<Self>(&display_handle),

@@ -525,12 +525,14 @@ impl<Window> GroupNode<Window> {
 	pub(crate) fn apply_changes<Error>(
 		&mut self,
 		reconfigure_window: &mut impl FnMut(&Window, i32, i32, u32, u32) -> Result<(), Error>,
+		settings: &LayoutSettings,
 	) -> Result<(), Error> {
+		// FIXME: need to also determine whether changes have been made to the layout settings.
 		// If no changes have been made to this group, apply all the child groups' changes and return.
 		if !self.changes_made() {
 			for node in self {
 				match node {
-					Node::Group(group) => group.apply_changes(reconfigure_window)?,
+					Node::Group(group) => group.apply_changes(reconfigure_window, settings)?,
 
 					Node::Window(WindowNode {
 						window,
@@ -622,7 +624,7 @@ impl<Window> GroupNode<Window> {
 			node.set_secondary_dimension(group_secondary, new_axis);
 
 			match node {
-				Node::Group(group) => group.apply_changes(reconfigure_window),
+				Node::Group(group) => group.apply_changes(reconfigure_window, settings),
 
 				Node::Window(WindowNode {
 					window,
@@ -638,29 +640,38 @@ impl<Window> GroupNode<Window> {
 			}
 		};
 
-		let new_nodes_len = (self.children.len() + self.additions.len()) as u32;
+		let current_nodes_len = self.children.len();
+		let new_nodes_len = (current_nodes_len + self.additions.len()) as u32;
+		let total_gap = if new_nodes_len == 0 {
+			0
+		} else {
+			(new_nodes_len - 1) * settings.window_gap
+		};
 		// The size of new additions.
 		let new_primary = if new_nodes_len == 0 {
 			group_primary
 		} else {
-			group_primary / new_nodes_len
+			(group_primary - total_gap) / new_nodes_len
 		};
 		let mut new_total_node_primary = 0;
 		// The new total size for the existing nodes to be resized to fit within.
 		//
 		// `u64` is used because we will be multiplying two 'u32' values, and `u64::MAX` is
 		// `u32::MAX * u32::MAX`.
-		let rescaling_primary = (group_primary - (new_primary * (additions.len() as u32))) as u64;
+		let rescaling_primary = (group_primary - (new_primary * (additions.len() as u32)) - total_gap) as u64;
 
 		let mut additions = additions.into_iter();
 		let mut next_addition = additions.next();
 
 		// Resize all the nodes appropriately.
 		for (index, node) in self.children.iter_mut().enumerate() {
+			let gap = (settings.window_gap as i32) * (index as i32);
+			let coord = (new_total_node_primary as i32) + gap;
+
 			// If `node` is an addition, resize it with the new size.
 			if let Some(addition) = next_addition {
 				if index == addition {
-					configure_node(node, new_total_node_primary as i32, new_primary)?;
+					configure_node(node, coord, new_primary)?;
 
 					next_addition = additions.next();
 
@@ -681,7 +692,7 @@ impl<Window> GroupNode<Window> {
 			// large - monitors don't tend to be millions of pixels in width or height.
 			let rescaled_primary: u32 = ((old_primary * rescaling_primary) / old_total_node_primary).shrink();
 
-			configure_node(node, new_total_node_primary as i32, rescaled_primary)?;
+			configure_node(node, coord, rescaled_primary)?;
 
 			new_total_node_primary += rescaled_primary;
 		}
@@ -722,7 +733,9 @@ mod tests {
 		assert_eq!(group.orientation(), NEW_ORIENTATION);
 
 		// Apply the change in orientation.
-		group.apply_changes(&mut resize_window).unwrap();
+		group
+			.apply_changes(&mut resize_window, &LayoutSettings::default())
+			.unwrap();
 
 		assert_eq!(group.orientation, NEW_ORIENTATION);
 		assert_eq!(group.new_orientation, None);
@@ -760,6 +773,8 @@ mod tests {
 		const GROUP_WIDTH: u32 = 3000;
 		const GROUP_HEIGHT: u32 = 1000;
 
+		let settings = LayoutSettings::new().window_gap(0);
+
 		// The width of each node after three nodes have been added.
 		const THREE_NODES_WIDTH: u32 = GROUP_WIDTH / 3;
 		// The width of each node after two nodes have been added.
@@ -787,7 +802,7 @@ mod tests {
 		);
 
 		// Resize the added window.
-		group.apply_changes(&mut resize_window).unwrap();
+		group.apply_changes(&mut resize_window, &settings).unwrap();
 
 		assert!(
 			matches!(
@@ -805,7 +820,7 @@ mod tests {
 		group.push_windows_back([2, 3]);
 
 		// Resize the existing window and two added windows.
-		group.apply_changes(&mut resize_window).unwrap();
+		group.apply_changes(&mut resize_window, &settings).unwrap();
 
 		for node in &group {
 			assert!(
@@ -826,7 +841,7 @@ mod tests {
 		group.remove(0);
 
 		// Resize the two remaining windows.
-		group.apply_changes(&mut resize_window).unwrap();
+		group.apply_changes(&mut resize_window, &settings).unwrap();
 
 		for node in &group {
 			assert!(
@@ -849,13 +864,13 @@ mod tests {
 		clone.push_window_front(1);
 		clone.remove(0);
 		// Apply the changes (of which there should be none).
-		clone.apply_changes(&mut resize_window).unwrap();
+		clone.apply_changes(&mut resize_window, &settings).unwrap();
 
 		assert_eq!(group, clone);
 
 		group.set_orientation(Orientation::TopToBottom);
 		// Apply the orientation change.
-		group.apply_changes(&mut resize_window).unwrap();
+		group.apply_changes(&mut resize_window, &settings).unwrap();
 
 		for node in &group {
 			assert!(

@@ -4,6 +4,8 @@
 
 use std::{collections::VecDeque, fmt::Debug};
 
+use derive_extras::builder;
+
 /// Contains `impl` blocks for types defined in [layout].
 ///
 /// This is a separate module to keep the [layout] module file more readable.
@@ -15,6 +17,23 @@ mod implementations;
 ///
 /// [layout managers]: TilingLayoutManager
 pub mod managers;
+
+// This is a false positive: `derive_extras::Default` is not the same as `Default`.
+#[allow(unused_qualifications)]
+/// Controls settings used when [applying] a [tiling layout].
+///
+/// [applying]: GroupNode::apply_changes
+/// [tiling layout]: TilingLayout
+#[derive(Debug, PartialEq, Eq, Hash, Clone, derive_extras::Default, builder)]
+#[new]
+pub struct LayoutSettings {
+	/// The gap between [nodes] in the [tiling layout].
+	///
+	/// [nodes]: Node
+	/// [tiling layout]: TilingLayout
+	#[default = 10]
+	pub window_gap: u32,
+}
 
 /// Whether a window is [`Tiled`] or [`Floating`].
 ///
