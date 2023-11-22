@@ -96,7 +96,7 @@ impl<Window: Eq + Hash + Clone> AquariWm<Window> {
 		Manager: layout::TilingLayoutManager<Window>,
 	{
 		Self {
-			layout: CurrentLayout::new_tiled::<Manager>(x, y, width, height),
+			layout: CurrentLayout::new_tiled::<Manager>(x, y, width, height, &settings),
 			settings,
 
 			windows: HashMap::new(),
@@ -131,7 +131,7 @@ impl<Window: Eq + Hash + Clone> AquariWm<Window> {
 		Manager: layout::TilingLayoutManager<Window>,
 	{
 		let mut aquariwm = Self {
-			layout: CurrentLayout::new_tiled::<Manager>(x, y, width, height),
+			layout: CurrentLayout::new_tiled::<Manager>(x, y, width, height, &settings),
 			settings,
 
 			windows: HashMap::new(),

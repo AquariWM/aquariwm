@@ -73,6 +73,9 @@ impl Xephyr {
 				// Sleep for 1s to wait for Xephyr to launch. Not ideal.
 				thread::sleep(Duration::from_secs(1));
 
+				// Spawn the `picom` compositor, if possible.
+				let _ = process::Command::new("picom").spawn();
+
 				Ok(Self(process))
 			},
 

@@ -71,6 +71,12 @@ pub enum CurrentLayout<Window> {
 /// [layout manager]: TilingLayoutManager
 pub struct TilingLayout<Window> {
 	root: GroupNode<Window>,
+
+	x: i32,
+	y: i32,
+
+	width: u32,
+	height: u32,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]

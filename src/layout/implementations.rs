@@ -18,11 +18,11 @@ impl<Window> CurrentLayout<Window> {
 	///
 	/// [tiled layout]: Self::Tiled
 	#[inline(always)]
-	pub(crate) fn new_tiled<Manager>(x: i32, y: i32, width: u32, height: u32) -> Self
+	pub(crate) fn new_tiled<Manager>(x: i32, y: i32, width: u32, height: u32, settings: &LayoutSettings) -> Self
 	where
 		Manager: TilingLayoutManager<Window>,
 	{
-		Self::tiled_with_windows::<Manager, std::iter::Empty<Window>>(x, y, width, height, std::iter::empty())
+		Self::tiled_with_windows::<Manager, std::iter::Empty<Window>>(x, y, width, height, std::iter::empty(), settings)
 	}
 
 	/// Creates a new [tiled layout] using the given layout `Manager` type parameter containing the
@@ -36,13 +36,14 @@ impl<Window> CurrentLayout<Window> {
 		width: u32,
 		height: u32,
 		windows: Windows,
+		settings: &LayoutSettings,
 	) -> Self
 	where
 		Manager: TilingLayoutManager<Window>,
 		Windows: IntoIterator<Item = Window>,
 		Windows::IntoIter: ExactSizeIterator,
 	{
-		let layout = TilingLayout::new(Manager::orientation(), x, y, width, height);
+		let layout = TilingLayout::new(Manager::orientation(), x, y, width, height, settings);
 
 		Self::Tiled(Box::new(Manager::init(layout, windows)))
 	}
@@ -51,10 +52,52 @@ impl<Window> CurrentLayout<Window> {
 impl<Window> TilingLayout<Window> {
 	/// Creates an empty layout of the given `orientation`.
 	#[inline]
-	pub(crate) const fn new(orientation: Orientation, x: i32, y: i32, width: u32, height: u32) -> Self {
+	pub(crate) const fn new(
+		orientation: Orientation,
+		x: i32,
+		y: i32,
+		width: u32,
+		height: u32,
+		settings: &LayoutSettings,
+	) -> Self {
+		let padding = settings.window_gap;
+
 		Self {
-			root: GroupNode::with(orientation, x, y, width, height),
+			x,
+			y,
+
+			width,
+			height,
+
+			root: GroupNode::with(
+				orientation,
+				x + (padding as i32),
+				y + (padding as i32),
+				width - (2 * padding),
+				height - (2 * padding),
+			),
 		}
+	}
+
+	/// Updates the tiling layout with the given `settings`.
+	///
+	/// Please note that for the nodes in the layout to be updated, [state::AquariWm::apply_changes]
+	#[cfg_attr(feature = "async", doc = "or [state::AquariWm::apply_changes_async]")]
+	/// must be called.
+	///
+	/// [state::AquariWm::apply]: crate::state::AquariWm::apply_changes
+	#[cfg_attr(
+		feature = "async",
+		doc = "[state::AquariWm::apply_changes_async]: crate::state::AquariWm::apply_changes_async"
+	)]
+	pub(crate) fn update_settings(&mut self, settings: &LayoutSettings) {
+		let padding = settings.window_gap;
+
+		self.root.new_x = Some(self.x + (padding as i32));
+		self.root.new_y = Some(self.y + (padding as i32));
+
+		self.root.new_width = Some(self.width - (2 * padding));
+		self.root.new_height = Some(self.height - (2 * padding));
 	}
 }
 
