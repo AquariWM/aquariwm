@@ -616,7 +616,12 @@ impl<Window> GroupNode<Window> {
 		let (group_primary, group_secondary) = (self.primary_dimension(), self.secondary_dimension());
 		let (group_primary_coord, group_secondary_coord) = (self.primary_coord(), self.secondary_coord());
 		// Set a node's dimensions and call `reconfigure_window` if it is a window.
-		let mut configure_node = |node: &mut Node<Window>, primary_coord, primary_dimension| {
+		let mut configure_node = |node: &mut Node<Window>, mut primary_coord, primary_dimension| {
+			// If the orientation is reversed, then reverse the coordinates.
+			if self.orientation.reversed() {
+				primary_coord = (group_primary as i32) - primary_coord - (primary_dimension as i32);
+			}
+
 			node.set_primary_coord(group_primary_coord + primary_coord, new_axis);
 			node.set_secondary_coord(group_secondary_coord, new_axis);
 
