@@ -2,7 +2,12 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use std::{collections::VecDeque, fmt::Debug};
+use std::{
+	cell::RefCell,
+	collections::VecDeque,
+	fmt::Debug,
+	rc::{Rc, Weak},
+};
 
 use derive_extras::builder;
 
@@ -132,6 +137,81 @@ pub enum Axis {
 pub enum Node<Window> {
 	Group(GroupNode<Window>),
 	Window(WindowNode<Window>),
+}
+
+pub enum NewNode<Window> {
+	Branch(Branch<Window>),
+	Leaf(Leaf<Window>),
+}
+
+pub struct Branch<Window>(Rc<RefCell<BranchData<Window>>>);
+
+struct BranchData<Window> {
+	orientation: Orientation,
+
+	parent: Option<Weak<RefCell<BranchData<Window>>>>,
+	children: VecDeque<Rc<RefCell<NewNode<Window>>>>,
+
+	x: i32,
+	y: i32,
+
+	width: u32,
+	height: u32,
+
+	/// A record of the changes made to the branch node that are yet to be applied.
+	///
+	/// Changes are applied all at once, because certain changes can be expensive and might only
+	/// have to be applied once, even for multiple operations.
+	///
+	/// For example, resizing a window is very expensive (not _necessarily_ for the window manager
+	/// itself, but most certainly for the window, which would have to re-render itself in
+	/// responsive to the change in dimensions).
+	changes_made: Option<BranchChanges>,
+}
+
+struct BranchChanges {
+	/// The branch's orientation has been changed to this.
+	///
+	/// Orientation changes are not applied immediately because it is useful to compare against the
+	/// old orientation to know if the axis has changed (if so, every child needs to be repositioned
+	/// and resized), or otherwise if whether the orientation is [reversed] has changed (children
+	/// only need to be repositioned).
+	///
+	/// [reversed]: Orientation::reversed
+	new_orientation: Option<Orientation>,
+	/// A sorted list of the indexes of the children added to the branch node.
+	additions: VecDeque<usize>,
+
+	/// Whether changes were made to the branch node's coordinates, dimensions, or both.
+	other_changes_made: Option<NodeChanges>,
+}
+
+pub struct Leaf<Window>(Rc<RefCell<LeafData<Window>>>);
+
+struct LeafData<Window> {
+	window: Window,
+
+	parent: Option<Weak<RefCell<BranchData<Window>>>>,
+
+	x: i32,
+	y: i32,
+
+	width: u32,
+	height: u32,
+
+	/// A record of changes made to the leaf node that have not yet been applied to the window.
+	changes_made: Option<NodeChanges>,
+}
+
+enum NodeChanges {
+	/// The node's coordinates have changed; window(s) need to be repositioned.
+	Coordinates,
+	/// The node's dimensions have changed; window(s) need to be resized.
+	Dimensions,
+
+	/// Both the node's coordinates and dimensions have changed; window(s) need to be repositioned
+	/// and resized.
+	Both,
 }
 
 /// Represents a group of [nodes] in a [layout] tree.
