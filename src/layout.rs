@@ -274,7 +274,7 @@ enum NodeChanges {
 ///
 /// [removed]: Self::remove_window
 /// [`remove_window`]: Self::remove_window
-pub unsafe trait TilingLayoutManager<Window>: Send + Sync + 'static {
+pub unsafe trait TilingLayoutManager<Window>: 'static {
 	/// The default [orientation] for layouts created with this layout manager.
 	///
 	/// [orientation]: Orientation

@@ -11,6 +11,73 @@ use super::*;
 
 mod iter;
 
+impl<Window> CurrentLayout<Window> {
+	/// Creates a new [tiled layout] using the given layout `Manager` type parameter.
+	///
+	/// [tiled layout]: Self::Tiled
+	#[inline(always)]
+	pub(crate) fn new_tiled<Manager>(x: i32, y: i32, width: u32, height: u32, settings: &LayoutSettings) -> Self
+	where
+		Manager: TilingLayoutManager<Window>,
+	{
+		Self::tiled_with_windows::<Manager, std::iter::Empty<Window>>(x, y, width, height, std::iter::empty(), settings)
+	}
+
+	/// Creates a new [tiled layout] using the given layout `Manager` type parameter containing the
+	/// given `windows`.
+	///
+	/// [tiled layout]: Self::Tiled
+	#[inline]
+	pub(crate) fn tiled_with_windows<Manager, Windows>(
+		x: i32,
+		y: i32,
+		width: u32,
+		height: u32,
+		windows: Windows,
+		settings: &LayoutSettings,
+	) -> Self
+	where
+		Manager: TilingLayoutManager<Window>,
+		Windows: IntoIterator<Item = Window>,
+		Windows::IntoIter: ExactSizeIterator,
+	{
+		let layout = TilingLayout::new(Manager::orientation(), x, y, width, height, settings);
+
+		Self::Tiled(Box::new(Manager::init(layout, windows)))
+	}
+}
+
+impl<Window> TilingLayout<Window> {
+	/// Creates an empty layout of the given `orientation`.
+	#[inline]
+	pub(crate) const fn new(
+		orientation: Orientation,
+		x: i32,
+		y: i32,
+		width: u32,
+		height: u32,
+		settings: &LayoutSettings,
+	) -> Self {
+		let padding = settings.window_gap;
+
+		Self {
+			x,
+			y,
+
+			width,
+			height,
+
+			root: Branch::with(
+				orientation,
+				x + (padding as i32),
+				y + (padding as i32),
+				width - (2 * padding),
+				height - (2 * padding),
+			),
+		}
+	}
+}
+
 impl Orientation {
 	/// Returns whether this orientation is *reversed*.
 	///
@@ -119,21 +186,25 @@ impl<Window> Leaf<Window> {
 }
 
 impl<Window> Branch<Window> {
-	/// Creates a new branch node with the given `window`.
+	/// Creates a new branch node with the given `orientation`.
+	#[inline(always)]
 	pub fn new(orientation: Orientation) -> Self {
+		Self::with(orientation, 0, 0, 0, 0)
+	}
+
+	/// Creates a new branch node with the given `orientation`, coordinates, and dimensions.
+	pub(crate) fn with(orientation: Orientation, x: i32, y: i32, width: u32, height: u32) -> Self {
 		Self(Rc::new(RefCell::new(BranchData {
 			orientation,
 
 			parent: None,
 			children: VecDeque::new(),
 
-			// Coordinates and dimensions are placeholder values until changes are applied to the
-			// parent branch node.
-			x: 0,
-			y: 0,
+			x,
+			y,
 
-			width: 0,
-			height: 0,
+			width,
+			height,
 
 			total_children_primary_dimensions: 0,
 
@@ -898,6 +969,27 @@ impl<Window> Branch<Window> {
 	}
 }
 
+impl<Window> TilingLayout<Window> {
+	#[inline]
+	pub(crate) fn apply_changes<Error>(
+		&mut self,
+		reconfigure_window: &mut impl FnMut(&Window, Option<(i32, i32)>, Option<(u32, u32)>) -> Result<(), Error>,
+		settings: &LayoutSettings,
+		settings_changed: bool,
+	) -> Result<(), Error> {
+		// If the settings have changed, set the other changes made to include both coordinates and
+		// dimensions. Changing the layout settings means everything needs to be recalculated.
+		if settings_changed {
+			RefCell::borrow_mut(&self.root.0)
+				.changes_made
+				.get_or_insert_with(BranchChanges::new)
+				.other_changes_made = Some(NodeChanges::Both);
+		}
+
+		self.root.apply_changes(reconfigure_window, settings)
+	}
+}
+
 impl<Window> Node<Window> {
 	#[inline(always)]
 	fn apply_changes<Error>(
@@ -1037,8 +1129,8 @@ impl<Window> Branch<Window> {
 							|node: &mut Node<Window>, mut node_primary_coord, node_primary_dimension| {
 								// If the orientation is reversed, then reverse the coordinates.
 								if new_reversed {
-									node_primary_coord =
-										(primary_dimension as i32) - node_primary_coord - node_primary_dimension;
+									node_primary_coord = (primary_dimension as i32)
+										- node_primary_coord - (node_primary_dimension as i32);
 								}
 
 								node.set_primary_coord(primary_coord + node_primary_coord, new_axis);
@@ -1055,7 +1147,7 @@ impl<Window> Branch<Window> {
 						let total_gap = if new_children_len == 0 {
 							0
 						} else {
-							(new_children_len - 1) * settings.window_gap;
+							(new_children_len - 1) * settings.window_gap
 						};
 						// The primary dimension of new additions.
 						let addition_primary_dimension = if new_children_len == 0 {
@@ -1064,7 +1156,8 @@ impl<Window> Branch<Window> {
 							(primary_dimension - total_gap) / new_children_len
 						};
 						// The old total primary dimensions of existing children.
-						let old_existing_children_total_primary_dimensions = borrow.total_children_primary_dimensions;
+						let old_existing_children_total_primary_dimensions =
+							borrow.total_children_primary_dimensions as u64;
 						// The target total primary dimensions of existing children for rescaling.
 						//
 						// `u64` is used because we will be multiplying t wo `u32` values
