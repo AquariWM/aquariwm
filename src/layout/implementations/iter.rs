@@ -9,36 +9,36 @@ use super::*;
 /// A wrapper around either `Iter` or <code>[Rev]\<Iter></code>.
 ///
 /// [Rev]: std::iter::Rev
-enum GroupIterator<Iter: Iterator> {
+enum BranchIterator<Iter: Iterator> {
 	Normal(Iter),
 	Rev(std::iter::Rev<Iter>),
 }
 
-/// A borrowing iterator over the children of a [group].
+/// A borrowing iterator over the children of a [branch].
 ///
-/// This is returned by [`GroupNode::iter()`].
+/// This is returned by [`Branch::iter()`].
 ///
-/// [group]: GroupNode
-pub struct Iter<'group, Window> {
-	iter: GroupIterator<vec_deque::Iter<'group, Node<Window>>>,
+/// [branch]: Branch
+pub struct Iter<'branch, Window> {
+	iter: BranchIterator<vec_deque::Iter<'branch, Node<Window>>>,
 }
 
-/// An owning iterator over the children of a [group].
+/// An owning iterator over the children of a [branch].
 ///
-/// This is returned by [`GroupNode::into_iter()`].
+/// This is returned by [`Branch::into_iter()`].
 ///
-/// [group]: GroupNode
+/// [branch]: Branch
 pub struct IntoIter<Window> {
-	into_iter: GroupIterator<vec_deque::IntoIter<Node<Window>>>,
+	into_iter: BranchIterator<vec_deque::IntoIter<Node<Window>>>,
 }
 
-/// A mutably borrowing iterator over the children of a [group].
+/// A mutably borrowing iterator over the children of a [branch].
 ///
-/// This is returned by [`GroupNode::iter_mut()`].
+/// This is returned by [`Branch::iter_mut()`].
 ///
-/// [group]: GroupNode
-pub struct IterMut<'group, Window> {
-	iter_mut: GroupIterator<vec_deque::IterMut<'group, Node<Window>>>,
+/// [branch]: Branch
+pub struct IterMut<'branch, Window> {
+	iter_mut: BranchIterator<vec_deque::IterMut<'branch, Node<Window>>>,
 }
 
 macro_rules! impl_iterator {
@@ -71,32 +71,6 @@ macro_rules! impl_iterator {
 		})?
 
 		////////////////////////////////////////////////////////////////////////////////////////////
-		// $Iter impls
-		////////////////////////////////////////////////////////////////////////////////////////////
-
-		impl<$($lt,)? $Window> $Iter<$($lt,)? $Window> {
-			fn new(group: $(&$lt $($mut)?)? GroupNode<$Window>) -> Self {
-				Self {
-					$iter: if !group.orientation().reversed() {
-						GroupIterator::Normal(group.children.$iter())
-					} else {
-						GroupIterator::Rev(group.children.$iter().rev())
-					},
-				}
-			}
-		}
-
-		impl<$($lt,)? $Window> IntoIterator for $(&$lt $($mut)?)? GroupNode<$Window> {
-			type Item = $(&$lt $($mut)?)? Node<$Window>;
-			type $IntoIter = $Iter<$($lt,)? $Window>;
-
-			$(#[$inner])*
-			fn $into_iter(self) -> Self::$IntoIter {
-				$Iter::new(self)
-			}
-		}
-
-		////////////////////////////////////////////////////////////////////////////////////////////
 		// Iterator impls
 		////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -106,16 +80,16 @@ macro_rules! impl_iterator {
 			#[inline]
 			fn next(&mut self) -> Option<Self::Item> {
 				match &mut self.$iter {
-					GroupIterator::Normal($iter) => $iter.next(),
-					GroupIterator::Rev($iter) => $iter.next(),
+					BranchIterator::Normal($iter) => $iter.next(),
+					BranchIterator::Rev($iter) => $iter.next(),
 				}
 			}
 
 			#[inline]
 			fn size_hint(&self) -> (usize, Option<usize>) {
 				match &self.$iter {
-					GroupIterator::Normal($iter) => $iter.size_hint(),
-					GroupIterator::Rev($iter) => $iter.size_hint(),
+					BranchIterator::Normal($iter) => $iter.size_hint(),
+					BranchIterator::Rev($iter) => $iter.size_hint(),
 				}
 			}
 
@@ -125,16 +99,16 @@ macro_rules! impl_iterator {
 				F: FnMut(Acc, Self::Item) -> Acc,
 			{
 				match self.$iter {
-					GroupIterator::Normal($iter) => $iter.fold(accum, f),
-					GroupIterator::Rev($iter) => $iter.fold(accum, f),
+					BranchIterator::Normal($iter) => $iter.fold(accum, f),
+					BranchIterator::Rev($iter) => $iter.fold(accum, f),
 				}
 			}
 
 			#[inline]
 			fn last(self) -> Option<Self::Item> {
 				match self.$iter {
-					GroupIterator::Normal($iter) => $iter.last(),
-					GroupIterator::Rev($iter) => $iter.last(),
+					BranchIterator::Normal($iter) => $iter.last(),
+					BranchIterator::Rev($iter) => $iter.last(),
 				}
 			}
 		}
@@ -143,8 +117,8 @@ macro_rules! impl_iterator {
 			#[inline]
 			fn next_back(&mut self) -> Option<Self::Item> {
 				match &mut self.$iter {
-					GroupIterator::Normal($iter) => $iter.next_back(),
-					GroupIterator::Rev($iter) => $iter.next_back(),
+					BranchIterator::Normal($iter) => $iter.next_back(),
+					BranchIterator::Rev($iter) => $iter.next_back(),
 				}
 			}
 
@@ -154,8 +128,8 @@ macro_rules! impl_iterator {
 				F: FnMut(Acc, Self::Item) -> Acc,
 			{
 				match self.$iter {
-					GroupIterator::Normal($iter) => $iter.rfold(accum, f),
-					GroupIterator::Rev($iter) => $iter.rfold(accum, f),
+					BranchIterator::Normal($iter) => $iter.rfold(accum, f),
+					BranchIterator::Rev($iter) => $iter.rfold(accum, f),
 				}
 			}
 		}
@@ -164,8 +138,8 @@ macro_rules! impl_iterator {
 			#[inline]
 			fn len(&self) -> usize {
 				match &self.$iter {
-					GroupIterator::Normal($iter) => $iter.len(),
-					GroupIterator::Rev($iter) => $iter.len(),
+					BranchIterator::Normal($iter) => $iter.len(),
+					BranchIterator::Rev($iter) => $iter.len(),
 				}
 			}
 		}
@@ -175,23 +149,69 @@ macro_rules! impl_iterator {
 }
 
 impl_iterator! {
-	for Iter<'group, Window> { iter };
-
-	for IntoIter<Window> { into_iter } {
-		/// Returns an owning iterator over the direct children of this group.
-		fn into_iter(self) -> Self::IntoIter;
-	}
-
-	for IterMut<'group mut, Window> { iter_mut };
+	for Iter<'branch, Window> { iter };
+	for IntoIter<Window> { into_iter };
+	for IterMut<'branch mut, Window> { iter_mut };
 }
 
-impl<Window> GroupNode<Window> {
-	/// Returns a borrowing iterator over the direct children of this group.
+impl<'branch, Window> IntoIterator for &'branch Branch<Window> {
+	type Item = &'branch Node<Window>;
+	type IntoIter = Iter<'branch, Window>;
+
+	fn into_iter(self) -> Self::IntoIter {
+		let borrow = RefCell::borrow(&self.0);
+
+		Iter {
+			iter: if self.orientation().reversed() {
+				BranchIterator::Rev(borrow.children.iter().rev())
+			} else {
+				BranchIterator::Normal(borrow.children.iter())
+			},
+		}
+	}
+}
+
+impl<'branch, Window> IntoIterator for &'branch mut Branch<Window> {
+	type Item = &'branch mut Node<Window>;
+	type IntoIter = IterMut<'branch, Window>;
+
+	fn into_iter(self) -> Self::IntoIter {
+		let borrow = RefCell::borrow_mut(&self.0);
+
+		IterMut {
+			iter_mut: if self.orientation().reversed() {
+				BranchIterator::Rev(borrow.children.iter_mut().rev())
+			} else {
+				BranchIterator::Normal(borrow.children.iter_mut())
+			},
+		}
+	}
+}
+
+impl<Window> Branch<Window> {
+	/// Returns a borrowing iterator over the direct children of this branch.
 	pub fn iter(&self) -> <&Self as IntoIterator>::IntoIter {
 		self.into_iter()
 	}
 
-	/// Returns a mutably borrowing iterator over the direct children of this group.
+	/// Returns an owning iterator over the direct children of this branch.
+	pub fn into_iter(self) -> Result<IntoIter<Window>, NodeUnwrapError> {
+		let orientation = self.orientation();
+
+		match Rc::try_unwrap(self.0) {
+			Ok(ref_cell) => Ok(IntoIter {
+				into_iter: if orientation.reversed() {
+					BranchIterator::Rev(ref_cell.into_inner().children.into_iter().rev())
+				} else {
+					BranchIterator::Normal(ref_cell.into_inner().children.into_iter())
+				},
+			}),
+
+			Err(_) => Err(NodeUnwrapError),
+		}
+	}
+
+	/// Returns a mutably borrowing iterator over the direct children of this branch.
 	pub fn iter_mut(&mut self) -> <&mut Self as IntoIterator>::IntoIter {
 		self.into_iter()
 	}
