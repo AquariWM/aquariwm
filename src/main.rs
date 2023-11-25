@@ -10,14 +10,14 @@
 
 use std::{env, ffi::OsString, io, process};
 
+use aquariwm::layout::LayoutSettings;
 use clap::Parser;
 use thiserror::Error;
 
-use crate::{display_server::DisplayServer, layout::LayoutSettings};
+use crate::display_server::DisplayServer;
 
 mod cli;
 pub mod display_server;
-pub mod layout;
 pub mod state;
 
 #[cfg(not(any(feature = "wayland", feature = "x11")))]

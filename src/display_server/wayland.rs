@@ -4,6 +4,7 @@
 
 use std::{any::Any, env, time::Duration};
 
+use aquariwm::layout::LayoutSettings;
 #[cfg(feature = "testing")]
 use smithay::backend::winit::{self, WinitEvent};
 use smithay::{
@@ -24,10 +25,7 @@ use smithay::{
 use thiserror::Error;
 use tracing::{event, span, Level};
 
-use crate::{
-	display_server::{DisplayServer, SyncDisplayServer},
-	layout::LayoutSettings,
-};
+use crate::display_server::{DisplayServer, SyncDisplayServer};
 
 pub mod grabs;
 mod input;

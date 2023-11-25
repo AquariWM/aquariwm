@@ -4,6 +4,7 @@
 
 use std::{env, fmt::Debug, future::Future, io, thread};
 
+use aquariwm::layout::{self, LayoutSettings};
 use futures::{future, try_join};
 use thiserror::Error;
 use tracing::{event, span, Level};
@@ -31,8 +32,6 @@ use x11rb_async::{
 
 use crate::{
 	display_server::{AsyncDisplayServer, DisplayServer},
-	layout,
-	layout::LayoutSettings,
 	state,
 };
 

@@ -2,6 +2,288 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+//! The layout of windows.
+//!
+//! There are two kinds of window layouts: _floating_ and _tiled_.
+//!
+//! ## Floating layouts
+//! A _floating_ layout is the traditional layout of windows used in Windows, MacOS, GNOME, KDE
+//! Plasma, and most other desktop environments: windows are manually repositioned and resized by
+//! the user, they may overlap each other, and they have a particular stacking order (from front to
+//! back).
+//!
+//! ## Tiling layouts
+//! A _tiled_ layout is a layout where windows are tiled next to each other in a [tiling layout]
+//! without overlapping each other. Because they don't overlap, their stacking order is irrelevant.
+//!
+//! # How do layouts work in AquariWM?
+//! AquariWM can operate using either a [floating layout] layout or a [tiled layout]. In a
+//! [floating layout], all windows are floating, like in a traditional floating window manager. In a
+//! [tiled layout], however, AquariWM has two layers: [tiled] windows at the bottom, and [floating]
+//! windows above them.
+//!
+//! Most windows default to being [tiled], other than certain exceptions (e.g. popup windows and
+//! docks). Windows may be switched between [tiled] and [floating] modes by the user. In a
+//! [floating layout], the window's [mode] is simply ignored; in a [tiled layout], it determines
+//! whether the window is actually tiled.
+//!
+//! ## How do tiling layouts work in AquariWM?
+//! Tiling layouts are represented by a [tree] of [nodes]. These nodes can either be [branches] or
+//! [leaves]. Branches represent a group of nodes somewhere in the tree with a particular
+//! [orientation]. Leaves represent the actual windows in the layout. Every tree has a single root
+//! branch, within which all the other nodes in the tree are contained.
+//!
+//! The way in which windows are placed into the [tree] is determined by a [layout manager].
+//! Whenever a window is put into the [tiled layout], the layout manager decides where to add a
+//! [leaf node] to the tree, and whether it needs to move other parts of the tree around. The layout
+//! manager may also move parts of the tree around when a window and its leaf node is removed from
+//! the tiled layout.
+//!
+//! The only thing the [layout manager] has control over is the _structure_ of the [tree]. The user
+//! is freely allowed to swap windows between [leaf nodes] without the involvement of the layout
+//! manager, as well as to resize the proportions of [nodes] within their [branch]. While each node
+//! has its own coordinates and dimensions, the layout manager is not made aware of them.
+//!
+//! When a [node] is first inserted into the [tree] by a [layout manager], it is given an equal
+//! proportion of its [parent branch]; that is, if it is the fifth node in its branch, it is given
+//! ⅕ of the branch. The user may resize that proportion afterwards, e.g. by dragging the node's
+//! boundary.
+//!
+//! When a [node] is added to or removed from a [branch], all the other nodes are uniformly
+//! rescaled. For example, if there are 3 nodes before a fourth is added, the existing 3 nodes will
+//! each be scaled down to ¾ of their former proportions. If one of those nodes were then to be
+//! removed, the rest would be scaled back up to once again fill the branch.
+//!
+//! ### Example - main and stack
+//! A popular tiling layout is the _main and stack_ layout. The main and stack layout consists of a
+//! _main_ window on the left, and a vertical _stack_ on the right with all the other windows. If
+//! there is only one window, then there will be no stack; if there are no windows, there will be
+//! neither stack nor main.
+//!
+//! A main and stack layout with 4 windows would be represented in AquariWM like so:
+//!
+//! <svg xmlns="http://www.w3.org/2000/svg" version = "1.1" viewBox="0 0 475 200" style = "width:475px; height:200px;">
+//!     <g>
+//!         <line x1="175px" y1="50px" x2="50px" y2="75px" style="stroke:white;stroke-width:2" />
+//!         <line x1="175px" y1="50px" x2="300px" y2="75px" style="stroke:white;stroke-width:2" />
+//!         <line x1="300px" y1="125px" x2="175px" y2="150px" style="stroke:white;stroke-width:2" />
+//!         <line x1="300px" y1="125px" x2="300px" y2="150px" style="stroke:white;stroke-width:2" />
+//!         <line x1="300px" y1="125px" x2="425px" y2="150px" style="stroke:white;stroke-width:2" />
+//!         <rect fill="red" x="125px" y="0px" width="100px" height="50px"></rect>
+//!         <rect fill="dodgerblue" x="0px" y="75px" width="100px" height="50px"></rect>
+//!         <rect fill="red" x="250px" y="75px" width="100px" height="50px"></rect>
+//!         <rect fill="dodgerblue" x="125px" y="150px" width="100px" height="50px"></rect>
+//!         <rect fill="dodgerblue" x="250px" y="150px" width="100px" height="50px"></rect>
+//!         <rect fill="dodgerblue" x="375px" y="150px" width="100px" height="50px"></rect>
+//!         <text
+//!             x="175px"
+//!             y="20px"
+//!             style="
+//!                 text-anchor: middle;
+//!                 dominant-baseline: middle;
+//!                 fill: white;
+//!                 font-size: 10px;
+//!                 font-family: sans-serif;
+//!                 font-weight: bold;
+//!             "
+//!         >
+//!             Root
+//!             <tspan x="175px" y="30px" style="font-weight: normal">
+//!                 Branch - Horizontal
+//!             </tspan>
+//!         </text>
+//!         <text
+//!             x="50px"
+//!             y="95px"
+//!             style="
+//!                 text-anchor: middle;
+//!                 dominant-baseline: middle;
+//!                 fill: white;
+//!                 font-size: 10px;
+//!                 font-family: sans-serif;
+//!                 font-weight: bold;
+//!             "
+//!         >
+//!             Main
+//!             <tspan x="50px" y="105px" style="font-weight: normal">
+//!                 Leaf
+//!             </tspan>
+//!         </text>
+//!         <text
+//!             x="300px"
+//!             y="95px"
+//!             style="
+//!                 text-anchor: middle;
+//!                 dominant-baseline: middle;
+//!                 fill: white;
+//!                 font-size: 10px;
+//!                 font-family: sans-serif;
+//!                 font-weight: bold;
+//!             "
+//!         >
+//!             Stack
+//!             <tspan x="300px" y="105px" style="font-weight: normal">
+//!                 Branch - Vertical
+//!             </tspan>
+//!         </text>
+//!         <text
+//!             x="175px"
+//!             y="170px"
+//!             style="
+//!                 text-anchor: middle;
+//!                 dominant-baseline: middle;
+//!                 fill: white;
+//!                 font-size: 10px;
+//!                 font-family: sans-serif;
+//!                 font-weight: bold;
+//!             "
+//!         >
+//!             A
+//!             <tspan x="175px" y="180px" style="font-weight: normal">
+//!                 Leaf
+//!             </tspan>
+//!         </text>
+//!         <text
+//!             x="300px"
+//!             y="170px"
+//!             style="
+//!                 text-anchor: middle;
+//!                 dominant-baseline: middle;
+//!                 fill: white;
+//!                 font-size: 10px;
+//!                 font-family: sans-serif;
+//!                 font-weight: bold;
+//!             "
+//!         >
+//!             B
+//!             <tspan x="300px" y="180px" style="font-weight: normal">
+//!                 Leaf
+//!             </tspan>
+//!         </text>
+//!         <text
+//!             x="425px"
+//!             y="170px"
+//!             style="
+//!                 text-anchor: middle;
+//!                 dominant-baseline: middle;
+//!                 fill: white;
+//!                 font-size: 10px;
+//!                 font-family: sans-serif;
+//!                 font-weight: bold;
+//!             "
+//!         >
+//!             C
+//!             <tspan x="425px" y="180px" style="font-weight: normal">
+//!                 Leaf
+//!             </tspan>
+//!         </text>
+//!     </g>
+//! </svg>
+//!
+//! [tree]: TilingLayout
+//! [layout manager]: TilingLayoutManager
+//!
+//! [node]: Node
+//! [nodes]: Node
+//!
+//! [parent branch]: Node::parent
+//!
+//! [branch]: Branch
+//! [branches]: Branch
+//!
+//! [leaves]: Leaf
+//! [leaf node]: Leaf
+//! [leaf nodes]: Leaf
+//!
+//! [orientation]: Orientation
+//!
+//! # Implementing [`TilingLayoutManager`]
+//! Layout managers, described in the previous section, can be defined by implementing the
+//! [`TilingLayoutManager`] trait.
+//!
+//! There are certain guarantees that a [`TilingLayoutManager`] implementation must uphold; these
+//! are detailed in the [`TilingLayoutManager`] documentation, which you should read before
+//! continuing.
+//!
+//! In this guide we will be implementing a very simple layout manager, where every window is simply
+//! put in a single horizontal row. You can get a lot more creative with your layout manager; I
+//! encourage you to look through the [tiling layout] and [branch] documentation to see what is
+//! possible (but make sure to uphold the [`TilingLayoutManager`] guarantees!).
+//!
+//! Before implementing [`TilingLayoutManager`], you must first begin with a struct which contains
+//! a [`TilingLayout`] - this is the layout tree which your layout manager will be managing.
+//! ```
+//! # use aquariwm::layout::TilingLayout;
+//! #
+//! pub struct Row<Window: PartialEq + 'static> {
+//!     layout: TilingLayout<Window>,
+//! }
+//! ```
+//! Notice that the layout manager is generic over the `Window` type that is used: this is because
+//! AquariWM is available on both X11 and Wayland, so the window type used will differ depending on
+//! the display server AquariWM is running on.
+//!
+//! The first thing we can do implementing [`TilingLayoutManager`] is to hook up the [`layout`] and
+//! [`layout_mut`] methods, as well as the initial [`orientation`] of the root [branch]:
+//! ```
+//! # use aquariwm::layout::{TilingLayoutManager, TilingLayout, Orientation};
+//! #
+//! # pub struct Row<Window: PartialEq + 'static> {
+//! #     layout: TilingLayout<Window>,
+//! # }
+//! #
+//! unsafe impl<Window> TilingLayoutManager<Window> for Row<Window>
+//! where
+//!     Window: PartialEq + 'static,
+//! {
+//!     #[inline(always)]
+//!     fn orientation() -> Orientation
+//!     where
+//!         Self: Sized,
+//!     {
+//!         Orientation::LeftToRight
+//!     }
+//! #
+//! # fn init<WindowsIter>(layout: TilingLayout<Window>, windows: WindowsIter) -> Self
+//! # where
+//! #     Self: Sized,
+//! #     WindowsIter: IntoIterator<Item = Window>,
+//! #     WindowsIter::IntoIter: ExactSizeIterator,
+//! # {
+//! #     unimplemented!();
+//! # }
+//!
+//!     #[inline(always)]
+//!     fn layout(&self) -> &TilingLayout<Window> {
+//!         &self.layout
+//!     }
+//!
+//!     #[inline(always)]
+//!     fn layout_mut(&mut self) -> &mut TilingLayout<Window> {
+//!         &mut self.layout
+//!     }
+//!
+//!     // ... TODO ...
+//! #
+//! # fn add_window(&mut self, window: Window) { unimplemented!() }
+//! # fn remove_window(&mut self, window: &Window) { unimplemented!() }
+//! }
+//! ```
+//! > TODO: finish guide: implementation of `init`, `add_window`, and `remove_window`.
+//!
+//! [`layout`]: TilingLayoutManager::layout
+//! [`layout_mut`]: TilingLayoutManager::layout_mut
+//! [`orientation`]: TilingLayoutManager::orientation
+//!
+//! [tiling layout]: TilingLayout
+//!
+//! [floating layout]: CurrentLayout::Floating
+//! [tiled layout]: CurrentLayout::Tiled
+//!
+//! [mode]: Mode
+//! [floating]: Mode::Floating
+//! [tiled]: Mode::Tiled
+
 use std::{
 	cell::RefCell,
 	collections::VecDeque,
@@ -125,12 +407,35 @@ pub enum Axis {
 	Vertical,
 }
 
+/// A node in a [tiling layout tree]; either a [branch] or a [leaf].
+///
+/// Note: nodes are internally represented with <code>[Rc]<[RefCell]<_>></code>. Cloning a node will
+/// only create a new reference to it.
+///
+/// [tiling layout tree]: TilingLayout
+/// [branch]: Branch
+/// [leaf]: Leaf
 #[derive(Debug, Clone)]
 pub enum Node<Window> {
+	/// A [branch node].
+	///
+	/// [branch node]: Branch
 	Branch(Branch<Window>),
+	/// A [leaf node].
+	///
+	/// [leaf node]: Leaf
 	Leaf(Leaf<Window>),
 }
 
+/// A branch in a [tiling layout tree] with a particular [orientation] and zero or more child
+/// [nodes].
+///
+/// Note: this is internally represented with <code>[Rc]<[RefCell]<_>></code>. Cloning a branch node
+/// will only create a new reference to the branch.
+///
+/// [tiling layout tree]: TilingLayout
+/// [orientation]: Orientation
+/// [nodes]: Node
 #[derive(Debug, Clone)]
 pub struct Branch<Window>(Rc<RefCell<BranchData<Window>>>);
 
@@ -183,6 +488,12 @@ struct BranchChanges {
 	other_changes_made: Option<NodeChanges>,
 }
 
+/// A leaf in a [tiling layout tree] representing a particular window.
+///
+/// Note: this is internally represented with <code>[Rc]<[RefCell]<_>></code>. Cloning a leaf node
+/// will only create a new reference to the leaf.
+///
+/// [tiling layout tree]: TilingLayout
 #[derive(Debug, Clone)]
 pub struct Leaf<Window>(Rc<RefCell<LeafData<Window>>>);
 
@@ -241,9 +552,11 @@ enum NodeChanges {
 /// This trait should be implemented for all possible window types so that it works on all AquariWM
 /// display server implementations.
 /// ```
-/// # struct MyManager<Window: Send + Sync + 'static>;
+/// # use aquariwm::layout::{TilingLayoutManager, Orientation, TilingLayout};
 /// #
-/// unsafe impl<Window: Send + Sync + 'static>
+/// # struct MyManager<Window: 'static>;
+/// #
+/// unsafe impl<Window: 'static>
 ///     TilingLayoutManager<Window> for MyManager<Window> {
 ///     // ...
 /// #     fn orientation() -> Orientation
@@ -266,6 +579,10 @@ enum NodeChanges {
 /// #     fn remove_window(&mut self, window: &Window) {}
 /// }
 /// ```
+///
+/// For a guide on implementing `TilingLayoutManager`, see [Implementing `TilingLayoutManager`].
+///
+/// [Implementing `TilingLayoutManager`]: self#implementing-tilinglayoutmanager
 ///
 /// [tiling layout]: TilingLayout
 ///
