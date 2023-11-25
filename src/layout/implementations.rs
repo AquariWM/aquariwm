@@ -2,7 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use std::mem;
+use std::{
+	borrow::{Borrow, BorrowMut},
+	mem,
+	ops::{Deref, DerefMut},
+};
 
 use thiserror::Error;
 use truncate_integer::Shrink;
@@ -50,7 +54,7 @@ impl<Window> CurrentLayout<Window> {
 impl<Window> TilingLayout<Window> {
 	/// Creates an empty layout of the given `orientation`.
 	#[inline]
-	pub(crate) const fn new(
+	pub(crate) fn new(
 		orientation: Orientation,
 		x: i32,
 		y: i32,
@@ -75,6 +79,32 @@ impl<Window> TilingLayout<Window> {
 				height - (2 * padding),
 			),
 		}
+	}
+}
+
+impl<Window> Borrow<Branch<Window>> for TilingLayout<Window> {
+	fn borrow(&self) -> &Branch<Window> {
+		&self.root
+	}
+}
+
+impl<Window> BorrowMut<Branch<Window>> for TilingLayout<Window> {
+	fn borrow_mut(&mut self) -> &mut Branch<Window> {
+		&mut self.root
+	}
+}
+
+impl<Window> Deref for TilingLayout<Window> {
+	type Target = Branch<Window>;
+
+	fn deref(&self) -> &Self::Target {
+		self
+	}
+}
+
+impl<Window> DerefMut for TilingLayout<Window> {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		self
 	}
 }
 
@@ -679,6 +709,108 @@ impl<Window> Branch<Window> {
 }
 
 impl<Window> Branch<Window> {
+	/// Returns a reference to the node at the given `index`.
+	///
+	/// If `index` is out of bounds, [`None`] is returned.
+	#[inline]
+	pub fn get(&self, index: usize) -> Option<&Node<Window>> {
+		let borrow = RefCell::borrow(&self.0);
+
+		if index < borrow.children.len() {
+			let index = unsafe { self.determine_index(index) };
+
+			Some(&borrow.children[index])
+		} else {
+			None
+		}
+	}
+
+	/// Returns a mutable reference to the node at the given `index`.
+	///
+	/// If `index` is out of bounds, [`None`] is returned.
+	#[inline]
+	pub fn get_mut(&mut self, index: usize) -> Option<&mut Node<Window>> {
+		let borrow = RefCell::borrow_mut(&self.0);
+
+		if index < borrow.children.len() {
+			let index = unsafe { self.determine_index(index) };
+
+			Some(&mut borrow.children[index])
+		} else {
+			None
+		}
+	}
+
+	/// Returns a reference to the first child in the branch.
+	///
+	/// If the branch has no children, [`None`] is returned.
+	#[inline]
+	pub fn first(&self) -> Option<&Node<Window>> {
+		let borrow = RefCell::borrow(&self.0);
+
+		match borrow.children.len() {
+			0 => None,
+			_ => {
+				let index = unsafe { self.determine_index(0) };
+
+				Some(&borrow.children[index])
+			},
+		}
+	}
+
+	/// Returns a mutable reference to the first child in the branch.
+	///
+	/// If the branch has no children, [`None`] is returned.
+	#[inline]
+	pub fn first_mut(&mut self) -> Option<&mut Node<Window>> {
+		let borrow = RefCell::borrow_mut(&self.0);
+
+		match borrow.children.len() {
+			0 => None,
+			_ => {
+				let index = unsafe { self.determine_index(0) };
+
+				Some(&mut borrow.children[index])
+			},
+		}
+	}
+
+	/// Returns a reference to the last child in the branch.
+	///
+	/// If the branch has no children, [`None`] is returned.
+	#[inline]
+	pub fn last(&self) -> Option<&Node<Window>> {
+		let borrow = RefCell::borrow(&self.0);
+
+		match borrow.children.len() {
+			0 => None,
+			len => {
+				let index = unsafe { self.determine_index(len - 1) };
+
+				Some(&borrow.children[index])
+			},
+		}
+	}
+
+	/// Returns a mutable reference to the last child in the branch.
+	///
+	/// If the branch has no children, [`None`] is returned.
+	#[inline]
+	pub fn last_mut(&mut self) -> Option<&mut Node<Window>> {
+		let borrow = RefCell::borrow_mut(&self.0);
+
+		match borrow.children.len() {
+			0 => None,
+			len => {
+				let index = unsafe { self.determine_index(len - 1) };
+
+				Some(&mut borrow.children[index])
+			},
+		}
+	}
+}
+
+impl<Window> Branch<Window> {
 	/// Determines the appropriate index based on whether the branch node's orientation is reversed.
 	///
 	/// # Safety
@@ -1160,7 +1292,7 @@ impl<Window> Branch<Window> {
 							borrow.total_children_primary_dimensions as u64;
 						// The target total primary dimensions of existing children for rescaling.
 						//
-						// `u64` is used because we will be multiplying t wo `u32` values
+						// `u64` is used because we will be multiplying two `u32` values
 						// (`u32::MAX * u32::MAX = u64::MAX`).
 						let new_existing_children_total_primary_dimensions = (primary_dimension
 							- (addition_primary_dimension * (additions.len() as u32))
