@@ -75,7 +75,7 @@ pub enum CurrentLayout<Window> {
 /// [tiled]: Mode::Tiled
 /// [layout manager]: TilingLayoutManager
 pub struct TilingLayout<Window> {
-	root: GroupNode<Window>,
+	root: Branch<Window>,
 
 	x: i32,
 	y: i32,
@@ -125,38 +125,34 @@ pub enum Axis {
 	Vertical,
 }
 
-/// Represents a node in a [layout] tree.
-///
-/// This can either be a [group] or a [window].
-///
-/// [layout]: TilingLayout
-///
-/// [group]: GroupNode
-/// [window]: Window
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, Clone)]
 pub enum Node<Window> {
-	Group(GroupNode<Window>),
-	Window(WindowNode<Window>),
-}
-
-pub enum NewNode<Window> {
 	Branch(Branch<Window>),
 	Leaf(Leaf<Window>),
 }
 
+#[derive(Debug, Clone)]
 pub struct Branch<Window>(Rc<RefCell<BranchData<Window>>>);
 
+#[derive(Debug, Clone)]
 struct BranchData<Window> {
 	orientation: Orientation,
 
 	parent: Option<Weak<RefCell<BranchData<Window>>>>,
-	children: VecDeque<Rc<RefCell<NewNode<Window>>>>,
+	children: VecDeque<Node<Window>>,
 
 	x: i32,
 	y: i32,
 
 	width: u32,
 	height: u32,
+
+	/// The total [primary dimensions] of the `children` in the branch.
+	///
+	/// This is used when rescaling nodes.
+	///
+	/// [primary dimensions]: Node::primary_dimension
+	total_children_primary_dimensions: u32,
 
 	/// A record of the changes made to the branch node that are yet to be applied.
 	///
@@ -169,6 +165,7 @@ struct BranchData<Window> {
 	changes_made: Option<BranchChanges>,
 }
 
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 struct BranchChanges {
 	/// The branch's orientation has been changed to this.
 	///
@@ -186,8 +183,10 @@ struct BranchChanges {
 	other_changes_made: Option<NodeChanges>,
 }
 
+#[derive(Debug, Clone)]
 pub struct Leaf<Window>(Rc<RefCell<LeafData<Window>>>);
 
+#[derive(Debug, Clone)]
 struct LeafData<Window> {
 	window: Window,
 
@@ -203,6 +202,7 @@ struct LeafData<Window> {
 	changes_made: Option<NodeChanges>,
 }
 
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 enum NodeChanges {
 	/// The node's coordinates have changed; window(s) need to be repositioned.
 	Coordinates,
@@ -212,75 +212,6 @@ enum NodeChanges {
 	/// Both the node's coordinates and dimensions have changed; window(s) need to be repositioned
 	/// and resized.
 	Both,
-}
-
-/// Represents a group of [nodes] in a [layout] tree.
-///
-/// [nodes]: Node
-/// [layout]: TilingLayout
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub struct GroupNode<Window> {
-	orientation: Orientation,
-
-	children: VecDeque<Node<Window>>,
-	/// The total size of all nodes along the [axis] of the group.
-	total_node_primary: u32,
-
-	/// Additions to `nodes` made by the [layout manager] in the latest [`add_window`] or
-	/// [`remove_window`] call.
-	///
-	/// This is a sorted list of indexes.
-	///
-	/// Additions are tracked so that nodes can be resized afterwards. This prevents multiple
-	/// resizings per node, which is particularly important when it comes to the resized windows.
-	///
-	/// [layout manager]: TilingLayoutManager
-	///
-	/// [`add_window`]: TilingLayoutManager::add_window
-	/// [`remove_window`]: TilingLayoutManager::remove_window
-	additions: VecDeque<usize>,
-	total_removed_primary: u32,
-
-	/// The new [`orientation`] for the group set by the [layout manager] in the latest
-	/// [`add_window`] or [`remove_window`] call.
-	///
-	/// [`orientation`]: Self::orientation()
-	/// [layout manager]: TilingLayoutManager
-	///
-	/// [`add_window`]: TilingLayoutManager::add_window
-	/// [`remove_window`]: TilingLayoutManager::remove_window
-	new_orientation: Option<Orientation>,
-
-	new_width: Option<u32>,
-	new_height: Option<u32>,
-
-	new_x: Option<i32>,
-	new_y: Option<i32>,
-
-	width: u32,
-	height: u32,
-
-	x: i32,
-	y: i32,
-}
-
-/// Represents a [node] containing a window.
-///
-/// [node]: Node
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub struct WindowNode<Window> {
-	window: Window,
-	/// Whether the `window` was changed in the latest [`add_window`] or [`remove_window`] call.
-	///
-	/// [`add_window`]: TilingLayoutManager::add_window
-	/// [`remove_window`]: TilingLayoutManager::remove_window
-	window_changed: bool,
-
-	width: u32,
-	height: u32,
-
-	x: i32,
-	y: i32,
 }
 
 /// Manages a [tiling layout], restructuring the layout when a window needs to be [added] or

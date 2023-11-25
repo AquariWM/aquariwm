@@ -2,11 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use std::{
-	borrow::{Borrow, BorrowMut},
-	mem,
-	ops::{Deref, DerefMut, Index, IndexMut},
-};
+use std::mem;
 
 use thiserror::Error;
 
@@ -138,12 +134,14 @@ impl<Window> Branch<Window> {
 			width: 0,
 			height: 0,
 
+			total_children_primary_dimensions: 0,
+
 			changes_made: None,
 		})))
 	}
 }
 
-impl<Window> NewNode<Window> {
+impl<Window> Node<Window> {
 	/// Creates a new leaf node with the given `window`.
 	///
 	/// This is equivalent to <code>Self::Leaf([Leaf::new]\(window))</code>.
@@ -161,7 +159,7 @@ impl<Window> NewNode<Window> {
 	}
 }
 
-impl<Window> NewNode<Window> {
+impl<Window> Node<Window> {
 	#[inline]
 	fn set_parent(&mut self, parent: Weak<RefCell<BranchData<Window>>>) {
 		match self {
@@ -186,6 +184,287 @@ impl<Window> NewNode<Window> {
 			Self::Branch(branch) => branch.parent(),
 		}
 	}
+}
+
+fn coordinates_changed(changes: &mut Option<NodeChanges>) {
+	match changes {
+		None => *changes = Some(NodeChanges::Coordinates),
+		Some(NodeChanges::Dimensions) => *changes = Some(NodeChanges::Both),
+
+		_ => (),
+	}
+}
+
+fn dimensions_changed(changes: &mut Option<NodeChanges>) {
+	match changes {
+		None => *changes = Some(NodeChanges::Dimensions),
+		Some(NodeChanges::Coordinates) => *changes = Some(NodeChanges::Both),
+
+		_ => (),
+	}
+}
+
+impl<Window> Node<Window> {
+	#[inline(always)]
+	pub fn x(&self) -> i32 {
+		match self {
+			Self::Leaf(leaf) => leaf.x(),
+			Self::Branch(branch) => branch.x(),
+		}
+	}
+
+	#[inline(always)]
+	pub fn y(&self) -> i32 {
+		match self {
+			Self::Leaf(leaf) => leaf.y(),
+			Self::Branch(branch) => branch.y(),
+		}
+	}
+
+	#[inline(always)]
+	pub fn primary_coord(&self, axis: Axis) -> i32 {
+		match self {
+			Self::Leaf(leaf) => leaf.primary_coord(axis),
+			Self::Branch(branch) => branch.primary_coord(axis),
+		}
+	}
+
+	#[inline(always)]
+	pub fn secondary_coord(&self, axis: Axis) -> i32 {
+		match self {
+			Self::Leaf(leaf) => leaf.secondary_coord(axis),
+			Self::Branch(branch) => branch.secondary_coord(axis),
+		}
+	}
+
+	#[inline(always)]
+	pub fn width(&self) -> u32 {
+		match self {
+			Self::Leaf(leaf) => leaf.width(),
+			Self::Branch(branch) => branch.width(),
+		}
+	}
+
+	#[inline(always)]
+	pub fn height(&self) -> u32 {
+		match self {
+			Self::Leaf(leaf) => leaf.height(),
+			Self::Branch(branch) => branch.height(),
+		}
+	}
+
+	#[inline(always)]
+	pub fn primary_dimension(&self, axis: Axis) -> u32 {
+		match self {
+			Self::Leaf(leaf) => leaf.primary_dimension(axis),
+			Self::Branch(branch) => branch.primary_dimension(axis),
+		}
+	}
+
+	#[inline(always)]
+	pub fn secondary_dimension(&self, axis: Axis) -> u32 {
+		match self {
+			Self::Leaf(leaf) => leaf.secondary_dimension(axis),
+			Self::Branch(branch) => branch.secondary_dimension(axis),
+		}
+	}
+
+	#[inline(always)]
+	pub fn set_x(&mut self, x: i32) {
+		match self {
+			Self::Leaf(leaf) => leaf.set_x(x),
+			Self::Branch(branch) => branch.set_x(x),
+		}
+	}
+
+	#[inline(always)]
+	pub fn set_y(&mut self, y: i32) {
+		match self {
+			Self::Leaf(leaf) => leaf.set_y(y),
+			Self::Branch(branch) => branch.set_y(y),
+		}
+	}
+
+	#[inline(always)]
+	pub fn set_primary_coord(&mut self, primary: i32, axis: Axis) {
+		match self {
+			Self::Leaf(leaf) => leaf.set_primary_coord(primary, axis),
+			Self::Branch(branch) => branch.set_primary_coord(primary, axis),
+		}
+	}
+
+	#[inline(always)]
+	pub fn set_secondary_coord(&mut self, secondary: i32, axis: Axis) {
+		match self {
+			Self::Leaf(leaf) => leaf.set_secondary_coord(secondary, axis),
+			Self::Branch(branch) => branch.set_secondary_coord(secondary, axis),
+		}
+	}
+
+	#[inline(always)]
+	pub fn set_width(&mut self, width: u32) {
+		match self {
+			Self::Leaf(leaf) => leaf.set_width(width),
+			Self::Branch(branch) => branch.set_width(width),
+		}
+	}
+
+	#[inline(always)]
+	pub fn set_height(&mut self, height: u32) {
+		match self {
+			Self::Leaf(leaf) => leaf.set_height(height),
+			Self::Branch(branch) => branch.set_height(height),
+		}
+	}
+
+	#[inline(always)]
+	pub fn set_primary_dimension(&mut self, primary: u32, axis: Axis) {
+		match self {
+			Self::Leaf(leaf) => leaf.set_primary_dimension(primary, axis),
+			Self::Branch(branch) => branch.set_primary_dimension(primary, axis),
+		}
+	}
+
+	#[inline(always)]
+	pub fn set_secondary_dimension(&mut self, secondary: u32, axis: Axis) {
+		match self {
+			Self::Leaf(leaf) => leaf.set_secondary_dimension(secondary, axis),
+			Self::Branch(branch) => branch.set_secondary_dimension(secondary, axis),
+		}
+	}
+}
+
+macro_rules! coords_dimensions {
+	(
+		$(
+			impl $Node:ident<$Window:ident>($borrow:ident => $node_changes:expr)
+		);*$(;)?
+	) => {
+		$(
+			impl<$Window> $Node<$Window> {
+				#[inline(always)]
+				pub fn x(&self) -> i32 {
+					RefCell::borrow(&self.0).x
+				}
+
+				#[inline(always)]
+				pub fn y(&self) -> i32 {
+					RefCell::borrow(&self.0).y
+				}
+
+				#[inline(always)]
+				pub fn primary_coord(&self, axis: Axis) -> i32 {
+					match axis {
+						Axis::Horizontal => RefCell::borrow(&self.0).x,
+						Axis::Vertical => RefCell::borrow(&self.0).y,
+					}
+				}
+
+				#[inline(always)]
+				pub fn secondary_coord(&self, axis: Axis) -> i32 {
+					match axis {
+						Axis::Horizontal => RefCell::borrow(&self.0).y,
+						Axis::Vertical => RefCell::borrow(&self.0).x,
+					}
+				}
+
+				#[inline(always)]
+				pub fn width(&self) -> u32 {
+					RefCell::borrow(&self.0).width
+				}
+
+				#[inline(always)]
+				pub fn height(&self) -> u32 {
+					RefCell::borrow(&self.0).height
+				}
+
+				#[inline(always)]
+				pub fn primary_dimension(&self, axis: Axis) -> u32 {
+					match axis {
+						Axis::Horizontal => RefCell::borrow(&self.0).width,
+						Axis::Vertical => RefCell::borrow(&self.0).height,
+					}
+				}
+
+				#[inline(always)]
+				pub fn secondary_dimension(&self, axis: Axis) -> u32 {
+					match axis {
+						Axis::Horizontal => RefCell::borrow(&self.0).height,
+						Axis::Vertical => RefCell::borrow(&self.0).width,
+					}
+				}
+
+				#[inline(always)]
+				pub fn set_x(&mut self, x: i32) {
+					let $borrow = RefCell::borrow_mut(&self.0);
+
+					$borrow.x = x;
+					coordinates_changed($node_changes);
+				}
+
+				#[inline(always)]
+				pub fn set_y(&mut self, y: i32) {
+					let $borrow = RefCell::borrow_mut(&self.0);
+
+					$borrow.y = y;
+					coordinates_changed($node_changes);
+				}
+
+				#[inline(always)]
+				pub fn set_primary_coord(&mut self, primary: i32, axis: Axis) {
+					match axis {
+						Axis::Horizontal => self.set_x(primary),
+						Axis::Vertical => self.set_y(primary),
+					}
+				}
+
+				#[inline(always)]
+				pub fn set_secondary_coord(&mut self, secondary: i32, axis: Axis) {
+					match axis {
+						Axis::Horizontal => self.set_y(secondary),
+						Axis::Vertical => self.set_x(secondary),
+					}
+				}
+
+				#[inline(always)]
+				pub fn set_width(&mut self, width: u32) {
+					let $borrow = RefCell::borrow_mut(&self.0);
+
+					$borrow.width = width;
+					dimensions_changed($node_changes);
+				}
+
+				#[inline(always)]
+				pub fn set_height(&mut self, height: u32) {
+					let $borrow = RefCell::borrow_mut(&self.0);
+
+					$borrow.height = height;
+					dimensions_changed($node_changes);
+				}
+
+				#[inline(always)]
+				pub fn set_primary_dimension(&mut self, primary: u32, axis: Axis) {
+					match axis {
+						Axis::Horizontal => self.set_width(primary),
+						Axis::Vertical => self.set_height(primary),
+					}
+				}
+
+				#[inline(always)]
+				pub fn set_secondary_dimension(&mut self, secondary: u32, axis: Axis) {
+					match axis {
+						Axis::Horizontal => self.set_height(secondary),
+						Axis::Vertical => self.set_width(secondary),
+					}
+				}
+			}
+		)*
+	};
+}
+
+coords_dimensions! {
+	impl Leaf<Window>(borrow => &mut borrow.changes_made);
+	impl Branch<Window>(borrow => &mut borrow.changes_made.get_or_insert_with(BranchChanges::new).other_changes_made);
 }
 
 /// An error returned if there are still references to a node when it is attempted to be unwrapped.
@@ -428,11 +707,11 @@ impl<Window> Branch<Window> {
 	/// The first and last [nodes][node] respectively can be removed with [`pop_front`] and
 	/// [`pop_back`].
 	///
-	/// [node]: NewNode
+	/// [node]: Node
 	///
 	/// [`pop_front`]: Self::pop_front
 	/// [`pop_back`]: Self::pop_back
-	pub fn remove(&mut self, index: usize) -> Option<Rc<RefCell<NewNode<Window>>>> {
+	pub fn remove(&mut self, index: usize) -> Option<Node<Window>> {
 		let borrow = RefCell::borrow_mut(&self.0);
 
 		if index < borrow.children.len() {
@@ -443,9 +722,10 @@ impl<Window> Branch<Window> {
 
 			let mut ret = borrow.children.remove(index);
 
-			// Remove the node's parent.
-			if let Some(ret) = ret.as_ref() {
-				RefCell::borrow_mut(ret).remove_parent();
+			if let Some(ret) = ret.as_mut() {
+				ret.remove_parent();
+				// NOTE: this is intentionally not `orientation()`.
+				borrow.total_children_primary_dimensions -= ret.primary_dimension(borrow.orientation.axis());
 			}
 
 			ret
@@ -455,64 +735,74 @@ impl<Window> Branch<Window> {
 	}
 
 	/// Pops the branch node's first child.
-	pub fn pop_front(&mut self) -> Option<Rc<RefCell<NewNode<Window>>>> {
+	pub fn pop_front(&mut self) -> Option<Node<Window>> {
 		let borrow = RefCell::borrow_mut(&self.0);
 
-		let mut ret = if borrow.orientation.reversed() {
-			// Track the pop.
-			Self::track_pop_back(
-				borrow.children.len(),
-				Self::get_or_create_additions(&mut borrow.changes_made),
-			);
+		if !borrow.children.is_empty() {
+			let mut ret = if borrow.orientation.reversed() {
+				// Track the pop.
+				Self::track_pop_back(
+					borrow.children.len() - 1,
+					Self::get_or_create_additions(&mut borrow.changes_made),
+				);
 
-			borrow.children.pop_back()
+				borrow.children.pop_back()
+			} else {
+				// Track the pop.
+				Self::track_pop_front(Self::get_or_create_additions(&mut borrow.changes_made));
+
+				borrow.children.pop_front()
+			};
+
+			if let Some(ret) = ret.as_mut() {
+				ret.remove_parent();
+				// NOTE: this is intentionally not `orientation()`.
+				borrow.total_children_primary_dimensions -= ret.primary_dimension(borrow.orientation.axis());
+			}
+
+			ret
 		} else {
-			// Track the pop.
-			Self::track_pop_front(Self::get_or_create_additions(&mut borrow.changes_made));
-
-			borrow.children.pop_front()
-		};
-
-		// Remove the node's parent.
-		if let Some(ret) = ret.as_ref() {
-			RefCell::borrow_mut(ret).remove_parent();
+			None
 		}
-
-		ret
 	}
 
 	/// Pop the branch node's last child.
-	pub fn pop_back(&mut self) -> Option<Rc<RefCell<NewNode<Window>>>> {
+	pub fn pop_back(&mut self) -> Option<Node<Window>> {
 		let borrow = RefCell::borrow_mut(&self.0);
 
-		let mut ret = if borrow.orientation.reversed() {
-			// Track the pop.
-			Self::track_pop_front(Self::get_or_create_additions(&mut borrow.changes_made));
+		if !borrow.children.is_empty() {
+			let mut ret = if borrow.orientation.reversed() {
+				// Track the pop.
+				Self::track_pop_front(Self::get_or_create_additions(&mut borrow.changes_made));
 
-			borrow.children.pop_front()
+				borrow.children.pop_front()
+			} else {
+				// Track the pop.
+				Self::track_pop_back(
+					borrow.children.len() - 1,
+					Self::get_or_create_additions(&mut borrow.changes_made),
+				);
+
+				borrow.children.pop_back()
+			};
+
+			if let Some(ret) = ret.as_mut() {
+				ret.remove_parent();
+				// NOTE: this is intentionally not `orientation()`.
+				borrow.total_children_primary_dimensions -= ret.primary_dimension(borrow.orientation.axis());
+			}
+
+			ret
 		} else {
-			// Track the pop.
-			Self::track_pop_back(
-				borrow.children.len(),
-				Self::get_or_create_additions(&mut borrow.changes_made),
-			);
-
-			borrow.children.pop_back()
-		};
-
-		// Remove the node's parent.
-		if let Some(ret) = ret.as_ref() {
-			RefCell::borrow_mut(ret).remove_parent();
+			None
 		}
-
-		ret
 	}
 
 	/// Inserts the given `node` at the given `index`.
 	///
 	/// # Panics
 	/// Panics if `index` is greater than the number of children in the branch node.
-	pub fn insert(&mut self, index: usize, mut node: NewNode<Window>) {
+	pub fn insert(&mut self, index: usize, mut node: Node<Window>) {
 		let len = RefCell::borrow(&self.0).children.len();
 
 		if index < len {
@@ -526,17 +816,16 @@ impl<Window> Branch<Window> {
 			// Track the insertion.
 			Self::track_insert(index, Self::get_or_create_additions(&mut borrow.changes_made));
 
-			borrow.children.insert(index, Rc::new(RefCell::new(node)));
+			borrow.children.insert(index, node);
 		} else {
 			panic!("the given `index` ({index}) was greater than the number of children ({len})");
 		}
 	}
 
 	/// Pushes the given `node` to the beginning of the branch node's children.
-	pub fn push_front(&mut self, mut node: NewNode<Window>) {
+	pub fn push_front(&mut self, mut node: Node<Window>) {
 		// Set the node's parent to this branch node.
 		node.set_parent(Rc::downgrade(&self.0));
-		let node = Rc::new(RefCell::new(node));
 
 		let borrow = RefCell::borrow_mut(&self.0);
 
@@ -557,10 +846,9 @@ impl<Window> Branch<Window> {
 	}
 
 	/// Pushes the given `node` to the end of the branch node's children.
-	pub fn push_back(&mut self, mut node: NewNode<Window>) {
+	pub fn push_back(&mut self, mut node: Node<Window>) {
 		// Set the node's parent to this branch node.
 		node.set_parent(Rc::downgrade(&self.0));
-		let node = Rc::new(RefCell::new(node));
 
 		let borrow = RefCell::borrow_mut(&self.0);
 
