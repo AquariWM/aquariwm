@@ -5,6 +5,7 @@
 use std::mem;
 
 use thiserror::Error;
+use truncate_integer::Shrink;
 
 use super::*;
 
@@ -679,7 +680,14 @@ impl<Window> Branch<Window> {
 	/// Tracks the insertion of a node at the given `index`.
 	#[inline]
 	fn track_insert(index: usize, additions: &mut VecDeque<usize>) {
-		additions.insert(additions.partition_point(|i| *i < index), index)
+		let insertion_point = additions.partition_point(|i| *i < index);
+
+		// Move the additions after the insertion point forward by one.
+		for addition in additions.range_mut(insertion_point..) {
+			*addition += 1;
+		}
+
+		additions.insert(insertion_point, index);
 	}
 
 	/// Tracks a node being pushed to the front.
@@ -697,6 +705,9 @@ impl<Window> Branch<Window> {
 	#[inline(always)]
 	fn track_push_back(index: usize, additions: &mut VecDeque<usize>) {
 		additions.push_back(index);
+
+		// No additions need to be moved over, because there are no additions following the pushed
+		// node.
 	}
 }
 
@@ -724,8 +735,14 @@ impl<Window> Branch<Window> {
 
 			if let Some(ret) = ret.as_mut() {
 				ret.remove_parent();
+
+				// Record changes to the branch due to the removal.
 				// NOTE: this is intentionally not `orientation()`.
 				borrow.total_children_primary_dimensions -= ret.primary_dimension(borrow.orientation.axis());
+				borrow
+					.changes_made
+					.get_or_insert_with(BranchChanges::new)
+					.other_changes_made = Some(NodeChanges::Both);
 			}
 
 			ret
@@ -756,8 +773,14 @@ impl<Window> Branch<Window> {
 
 			if let Some(ret) = ret.as_mut() {
 				ret.remove_parent();
+
+				// Record changes to the branch due to the removal.
 				// NOTE: this is intentionally not `orientation()`.
 				borrow.total_children_primary_dimensions -= ret.primary_dimension(borrow.orientation.axis());
+				borrow
+					.changes_made
+					.get_or_insert_with(BranchChanges::new)
+					.other_changes_made = Some(NodeChanges::Both);
 			}
 
 			ret
@@ -788,8 +811,14 @@ impl<Window> Branch<Window> {
 
 			if let Some(ret) = ret.as_mut() {
 				ret.remove_parent();
+
+				// Record changes to the branch due to the removal.
 				// NOTE: this is intentionally not `orientation()`.
 				borrow.total_children_primary_dimensions -= ret.primary_dimension(borrow.orientation.axis());
+				borrow
+					.changes_made
+					.get_or_insert_with(BranchChanges::new)
+					.other_changes_made = Some(NodeChanges::Both);
 			}
 
 			ret
@@ -866,5 +895,227 @@ impl<Window> Branch<Window> {
 
 			borrow.children.push_back(node);
 		};
+	}
+}
+
+impl<Window> Node<Window> {
+	#[inline(always)]
+	fn apply_changes<Error>(
+		&mut self,
+		reconfigure_window: &mut impl FnMut(&Window, Option<(i32, i32)>, Option<(u32, u32)>) -> Result<(), Error>,
+		settings: &LayoutSettings,
+	) -> Result<(), Error> {
+		match self {
+			Self::Leaf(leaf) => leaf.apply_changes(reconfigure_window),
+			Self::Branch(branch) => branch.apply_changes(reconfigure_window, settings),
+		}
+	}
+}
+
+impl<Window> Leaf<Window> {
+	fn apply_changes<Error>(
+		&self,
+		reconfigure_window: &mut impl FnMut(&Window, Option<(i32, i32)>, Option<(u32, u32)>) -> Result<(), Error>,
+	) -> Result<(), Error> {
+		let borrow = RefCell::borrow_mut(&self.0);
+
+		let (coordinates, dimensions) = match mem::take(&mut borrow.changes_made) {
+			// If no changes have been made, then don't call `reconfigure_window`.
+			None => return Ok(()),
+
+			Some(NodeChanges::Coordinates) => (Some((borrow.x, borrow.y)), None),
+			Some(NodeChanges::Dimensions) => (None, Some((borrow.width, borrow.height))),
+
+			Some(NodeChanges::Both) => (Some((borrow.x, borrow.y)), Some((borrow.width, borrow.height))),
+		};
+
+		reconfigure_window(&borrow.window, coordinates, dimensions)
+	}
+}
+
+impl<Window> Branch<Window> {
+	fn apply_changes<Error>(
+		&mut self,
+		reconfigure_window: &mut impl FnMut(&Window, Option<(i32, i32)>, Option<(u32, u32)>) -> Result<(), Error>,
+		settings: &LayoutSettings,
+	) -> Result<(), Error> {
+		let borrow = RefCell::borrow_mut(&self.0);
+
+		match mem::take(&mut borrow.changes_made) {
+			// No changes have been made to the branch node directly, so just apply any changes made
+			// to the branch's children.
+			None => {
+				for node in self {
+					node.apply_changes(reconfigure_window, settings)?;
+				}
+			},
+
+			// Changes have been made to the branch node itself.
+			Some(BranchChanges {
+				new_orientation,
+				additions,
+				mut other_changes_made,
+			}) => {
+				// The old axis of the group, before any orientation change.
+				let old_axis = borrow.orientation.axis();
+				// Whether the direction (whether it's reversed or not) and axis of the orientation
+				// have changed.
+				let (direction_changed, axis_changed) = match &new_orientation {
+					None => (false, false),
+
+					Some(orientation) => (
+						orientation.reversed() != borrow.orientation.reversed(),
+						orientation.axis() != old_axis,
+					),
+				};
+
+				if axis_changed || !additions.is_empty() {
+					match &other_changes_made {
+						None | Some(NodeChanges::Coordinates) => other_changes_made = Some(NodeChanges::Both),
+
+						_ => (),
+					}
+				} else if direction_changed {
+					match &other_changes_made {
+						None => other_changes_made = Some(NodeChanges::Coordinates),
+
+						_ => (),
+					}
+				}
+
+				// Apply the change in orientation, if any.
+				if let Some(orientation) = new_orientation {
+					borrow.orientation = orientation;
+				}
+
+				let new_axis = borrow.orientation.axis();
+				let new_reversed = borrow.orientation.reversed();
+
+				let (primary_dimension, secondary_dimension) =
+					(self.primary_dimension(new_axis), self.secondary_dimension(new_axis));
+				let (primary_coord, secondary_coord) = (self.primary_coord(new_axis), self.secondary_coord(new_axis));
+
+				match other_changes_made {
+					// No further changes need to be made.
+					None => (),
+
+					// Only coordinates need to be updated.
+					Some(NodeChanges::Coordinates) => {
+						if new_reversed {
+							// The orientation is reversed, so do the coordinates from right to left.
+
+							let mut node_primary_coord = primary_coord + (primary_dimension as i32);
+
+							for node in self {
+								node_primary_coord -= node.primary_dimension(new_axis) as i32;
+
+								node.set_primary_coord(node_primary_coord, new_axis);
+								node.set_secondary_coord(secondary_coord, new_axis);
+
+								node.apply_changes(reconfigure_window, settings)?;
+							}
+						} else {
+							// The orientation is not reversed, so do the coordinates from left to right.
+
+							let mut node_primary_coord = primary_coord;
+
+							for node in self {
+								node.set_primary_coord(node_primary_coord, new_axis);
+								node.set_secondary_coord(secondary_coord, new_axis);
+
+								node.apply_changes(reconfigure_window, settings)?;
+
+								node_primary_coord += node.primary_dimension(new_axis) as i32;
+							}
+						}
+					},
+
+					// Both coordinates and dimensions need to be updated.
+					_ => {
+						// Reconfigures the given `node` to the given coordinates and dimensions.
+						let mut configure_node =
+							|node: &mut Node<Window>, mut node_primary_coord, node_primary_dimension| {
+								// If the orientation is reversed, then reverse the coordinates.
+								if new_reversed {
+									node_primary_coord =
+										(primary_dimension as i32) - node_primary_coord - node_primary_dimension;
+								}
+
+								node.set_primary_coord(primary_coord + node_primary_coord, new_axis);
+								node.set_secondary_coord(secondary_coord, new_axis);
+
+								node.set_primary_dimension(node_primary_dimension, new_axis);
+								node.set_secondary_dimension(secondary_dimension, new_axis);
+
+								node.apply_changes(reconfigure_window, settings)
+							};
+
+						let new_children_len = (borrow.children.len() + additions.len()) as u32;
+						// The total window gap between the child nodes.
+						let total_gap = if new_children_len == 0 {
+							0
+						} else {
+							(new_children_len - 1) * settings.window_gap;
+						};
+						// The primary dimension of new additions.
+						let addition_primary_dimension = if new_children_len == 0 {
+							primary_dimension
+						} else {
+							(primary_dimension - total_gap) / new_children_len
+						};
+						// The old total primary dimensions of existing children.
+						let old_existing_children_total_primary_dimensions = borrow.total_children_primary_dimensions;
+						// The target total primary dimensions of existing children for rescaling.
+						//
+						// `u64` is used because we will be multiplying t wo `u32` values
+						// (`u32::MAX * u32::MAX = u64::MAX`).
+						let new_existing_children_total_primary_dimensions = (primary_dimension
+							- (addition_primary_dimension * (additions.len() as u32))
+							- total_gap) as u64;
+
+						let mut new_total_children_primary_dimensions = 0;
+
+						let mut additions = additions.into_iter();
+						let mut next_addition = additions.next();
+
+						for (index, node) in borrow.children.iter_mut().enumerate() {
+							let gap = (settings.window_gap as i32) * (index as i32);
+							let node_primary_coord = (new_total_children_primary_dimensions as i32) + gap;
+
+							// If `node` is an addition, configure it and `continue` to the next node.
+							if let Some(addition) = next_addition {
+								if index == addition {
+									// Configure the node.
+									configure_node(node, node_primary_coord, addition_primary_dimension)?;
+
+									next_addition = additions.next();
+
+									new_total_children_primary_dimensions += addition_primary_dimension;
+									continue;
+								}
+							}
+
+							// If `node` is an existing node, not a new addition, rescale it.
+
+							let old_node_primary_dimension = node.primary_dimension(old_axis) as u64;
+							// Rescale the node's primary dimension.
+							let new_node_primary_dimension: u32 = ((old_node_primary_dimension
+								* new_existing_children_total_primary_dimensions)
+								/ old_existing_children_total_primary_dimensions)
+								.shrink();
+
+							// Configure the node.
+							configure_node(node, node_primary_coord, new_node_primary_dimension)?;
+
+							new_total_children_primary_dimensions += new_node_primary_dimension;
+						}
+
+						borrow.total_children_primary_dimensions = new_total_children_primary_dimensions;
+					},
+				}
+			},
+		}
+
+		Ok(())
 	}
 }
