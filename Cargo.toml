@@ -48,7 +48,7 @@ tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 ####################################################################################################
 # X11
 [dependencies.x11rb-async]
-version = "0.12.0"
+version = "0.13.0"
 optional = true
 
 # Wayland
