@@ -265,4 +265,4 @@ jobs:
             # Deploys the documentation to GitHub Pages using the artifact (stored
             # but not committed changes for Actions) saved earlier.
             -   name: Deploy documentation to GitHub Pages
-                uses: actions/deploy-pages@v3
+                uses: actions/deploy-pages@v4
